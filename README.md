@@ -77,7 +77,7 @@ pip install -r requirements-dev.txt
 python scripts/generate_narration.py
 ```
 
-Generation requires an internet connection. The script skips existing files; use `python scripts/generate_narration.py --force` to regenerate them. The default voice is `en-IN-NeerjaNeural`; edit `VOICE` and `RATE` at the top of the script. Use `edge-tts --list-voices` to browse available voices.
+Generation requires an internet connection. The script compares each scene's speech and voice hash with `public/audio/manifest.json`, regenerating missing or stale files; use `python scripts/generate_narration.py --force` to regenerate all scenes. The build logs a prominent warning when the manifest is stale. The default voice is `en-IN-NeerjaNeural`; edit `VOICE` and `RATE` at the top of the script. Use `edge-tts --list-voices` to browse available voices. Run `python scripts/generate_narration.py --sample` to create comparison clips for three voices in `public/audio/voice-samples/`.
 
 ## Limitations
 

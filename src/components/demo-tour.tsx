@@ -7,7 +7,7 @@ import scenes from "@/data/demo-scenes.json";
 const PACE = 1.25;
 const TOUR_KEY = "medclear-demo-tour-state";
 const MUTE_KEY = "medclear-demo-muted";
-const SCENE_DURATIONS_MS = [8000, 8000, 5000, 8000, 7000, 12000, 10000, 8000, 10000, 8000];
+const NO_AUDIO_FALLBACK_MS = [2200, 1700, 1200, 2000, 1500, 2200, 1700, 1700, 2200, 2000];
 const TOUR_STORAGE_KEYS = ["medclear-analysis", "medclear-demo"] as const;
 
 type Scene = (typeof scenes)[number];
@@ -20,6 +20,7 @@ type TourState = {
   takenValue: string | null;
   session: StorageSnapshot;
 };
+type NarrationPlayback = { started: Promise<boolean>; ended: Promise<boolean>; durationMs: () => number };
 
 function todayKey() {
   const date = new Date();
@@ -43,13 +44,29 @@ function wait(ms: number, signal: AbortSignal) {
   });
 }
 
+function sleep(ms: number, signal: AbortSignal) {
+  return new Promise<void>((resolve, reject) => {
+    let remaining = Math.max(0, ms);
+    const slice = () => {
+      if (signal.aborted) return reject(new Error("stopped"));
+      if (remaining <= 0) return resolve();
+      const amount = Math.min(50, remaining);
+      window.setTimeout(() => {
+        remaining -= amount;
+        slice();
+      }, amount);
+    };
+    slice();
+  });
+}
+
 async function waitFor(selector: string, signal: AbortSignal) {
   const started = Date.now();
   while (Date.now() - started < 5000) {
     if (signal.aborted) throw new Error("stopped");
     const element = document.querySelector<HTMLElement>(selector);
     if (element) return element;
-    await wait(50, signal);
+    await sleep(50, signal);
   }
   throw new Error(`Tour target not found within 5 seconds: ${selector}`);
 }
@@ -138,7 +155,7 @@ export default function DemoTour() {
   }, [releaseAudio, router]);
 
   const preload = useCallback((scene: Scene | undefined) => {
-    if (!scene || mutedRef.current) return;
+    if (!scene) return;
     if (preloadedAudioRef.current?.id === scene.id) return;
     const audio = new Audio(`/audio/${scene.id}.mp3`);
     audio.preload = "auto";
@@ -146,41 +163,103 @@ export default function DemoTour() {
     preloadedAudioRef.current = { id: scene.id, audio };
   }, []);
 
-  const playNarration = useCallback((scene: Scene): Promise<void> => {
-    if (mutedRef.current) return Promise.resolve();
+  const playNarration = useCallback((scene: Scene): NarrationPlayback => {
+    if (mutedRef.current) return { started: Promise.resolve(false), ended: Promise.resolve(false), durationMs: () => 0 };
     const preloaded = preloadedAudioRef.current?.id === scene.id ? preloadedAudioRef.current.audio : null;
     preloadedAudioRef.current = null;
     const audio = preloaded ?? new Audio(`/audio/${scene.id}.mp3`);
     audio.preload = "auto";
     activeAudioRef.current = audio;
-    return new Promise((resolve) => {
+    let resolveStarted!: (started: boolean) => void;
+    let playStartedAt = 0;
+    let playDurationMs = 0;
+    const started = new Promise<boolean>((resolve) => { resolveStarted = resolve; });
+    const ended = new Promise<boolean>((resolveEnded) => {
       let settled = false;
+      let hasStarted = false;
       let timeout = 0;
-      const settle = () => {
+      const markStarted = () => {
+        if (hasStarted) return;
+        hasStarted = true;
+        playStartedAt = Date.now();
+        resolveStarted(true);
+      };
+      const settle = (finished: boolean) => {
         if (settled) return;
         settled = true;
         window.clearTimeout(timeout);
-        audio.removeEventListener("ended", settle);
-        audio.removeEventListener("error", settle);
+        if (hasStarted) playDurationMs = Date.now() - playStartedAt;
+        audio.removeEventListener("playing", markStarted);
+        audio.removeEventListener("ended", onEnded);
+        audio.removeEventListener("error", onError);
         if (activeAudioRef.current === audio) activeAudioRef.current = null;
-        if (activeAudioDoneRef.current === settle) activeAudioDoneRef.current = null;
+        if (activeAudioDoneRef.current === stopAudio) activeAudioDoneRef.current = null;
         audio.pause();
         audio.removeAttribute("src");
         audio.load();
-        resolve();
+        if (!hasStarted) resolveStarted(false);
+        resolveEnded(finished && hasStarted);
       };
-      activeAudioDoneRef.current = settle;
-      audio.addEventListener("ended", settle, { once: true });
-      audio.addEventListener("error", settle, { once: true });
-      timeout = window.setTimeout(settle, 30_000);
-      audio.play().catch(settle);
+      const onEnded = () => settle(true);
+      const onError = () => settle(false);
+      const stopAudio = () => settle(false);
+      activeAudioDoneRef.current = stopAudio;
+      audio.addEventListener("playing", markStarted, { once: true });
+      audio.addEventListener("ended", onEnded, { once: true });
+      audio.addEventListener("error", onError, { once: true });
+      timeout = window.setTimeout(() => settle(false), 30_000);
+      try {
+        audio.play().then(markStarted).catch(onError);
+      } catch {
+        onError();
+      }
     });
+    return { started, ended, durationMs: () => playDurationMs };
   }, []);
 
   const saveTour = useCallback((next: TourState) => {
     tourRef.current = next;
     sessionStorage.setItem(TOUR_KEY, JSON.stringify(next));
   }, []);
+
+  const runSceneActions = useCallback(async (sceneId: string, signal: AbortSignal) => {
+    if (sceneId === "scene_01") {
+      focusOn(await waitFor('[data-tour="landing-hero"]', signal));
+      focusOn(await waitFor('[data-tour="landing-disclaimer"]', signal));
+    } else if (sceneId === "scene_02") {
+      router.push("/scan");
+      focusOn(await waitFor('[data-tour="scan-preview"]', signal));
+    } else if (sceneId === "scene_03") {
+      const sampleButton = document.querySelector<HTMLElement>('[data-tour="sample-button"]');
+      if (sampleButton) click(sampleButton);
+      await waitFor('[data-tour="medicine-card-0"]', signal);
+    } else if (sceneId === "scene_04") {
+      focusOn(await waitFor('[data-tour="medicine-card-0"]', signal));
+    } else if (sceneId === "scene_05") {
+      focusOn(await waitFor('[data-tour="unreadable-section"]', signal));
+    } else if (sceneId === "scene_06") {
+      focusOn(await waitFor('[data-tour="schedule-section"]', signal));
+      focusOn(await waitFor('[data-tour="schedule-morning"]', signal));
+      const morningDose = await waitFor('[data-tour="dose-check-morning-1"]', signal);
+      if (morningDose instanceof HTMLInputElement && !morningDose.checked) click(morningDose);
+      focusOn(await waitFor('[data-tour="schedule-afternoon"]', signal));
+      const afternoonDose = await waitFor('[data-tour="dose-check-afternoon-2"]', signal);
+      if (afternoonDose instanceof HTMLInputElement && !afternoonDose.checked) click(afternoonDose);
+      focusOn(await waitFor('[data-tour="schedule-night"]', signal));
+    } else if (sceneId === "scene_07") {
+      focusOn(await waitFor('[data-tour="safety-duplicate"]', signal));
+    } else if (sceneId === "scene_08") {
+      focusOn(await waitFor('[data-tour="safety-interaction"]', signal));
+    } else if (sceneId === "scene_09") {
+      const language = await waitFor('[data-tour="language-switcher"]', signal);
+      focusOn(language);
+      selectValue(language, "hi");
+      await sleep(120, signal);
+      selectValue(language, "mr");
+    } else {
+      focusOn(await waitFor('[data-tour="closing-disclaimer"]', signal));
+    }
+  }, [focusOn, router]);
 
   const runTour = useCallback(async (initialState: TourState) => {
     if (runStartedRef.current) return;
@@ -201,56 +280,27 @@ export default function DemoTour() {
         await waitFor('[data-tour="demo-caption"]', signal);
         await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
         const sceneStarted = Date.now();
-        const audioDone = playNarration(scene);
+        const narration = playNarration(scene);
         preload(scenes[index + 1]);
-
-        if (scene.id === "scene_01") {
-          focusOn(await waitFor('[data-tour="landing-hero"]', signal));
-          focusOn(await waitFor('[data-tour="landing-disclaimer"]', signal));
-        } else if (scene.id === "scene_02") {
-          router.push("/scan");
-          focusOn(await waitFor('[data-tour="scan-preview"]', signal));
-        } else if (scene.id === "scene_03") {
-          const sampleButton = document.querySelector<HTMLElement>('[data-tour="sample-button"]');
-          if (sampleButton) click(sampleButton);
-          await waitFor('[data-tour="medicine-card-0"]', signal);
-        } else if (scene.id === "scene_04") {
-          focusOn(await waitFor('[data-tour="medicine-card-0"]', signal));
-        } else if (scene.id === "scene_05") {
-          focusOn(await waitFor('[data-tour="unreadable-section"]', signal));
-        } else if (scene.id === "scene_06") {
-          focusOn(await waitFor('[data-tour="schedule-section"]', signal));
-          focusOn(await waitFor('[data-tour="schedule-morning"]', signal));
-          const morningDose = await waitFor('[data-tour="dose-check-morning-1"]', signal);
-          if (morningDose instanceof HTMLInputElement && !morningDose.checked) click(morningDose);
-          focusOn(await waitFor('[data-tour="schedule-afternoon"]', signal));
-          const afternoonDose = await waitFor('[data-tour="dose-check-afternoon-2"]', signal);
-          if (afternoonDose instanceof HTMLInputElement && !afternoonDose.checked) click(afternoonDose);
-          focusOn(await waitFor('[data-tour="schedule-night"]', signal));
-        } else if (scene.id === "scene_07") {
-          focusOn(await waitFor('[data-tour="safety-duplicate"]', signal));
-        } else if (scene.id === "scene_08") {
-          focusOn(await waitFor('[data-tour="safety-interaction"]', signal));
-        } else if (scene.id === "scene_09") {
-          const language = await waitFor('[data-tour="language-switcher"]', signal);
-          focusOn(language);
-          selectValue(language, "hi");
-          await wait(3500, signal);
-          selectValue(language, "mr");
-        } else {
-          focusOn(await waitFor('[data-tour="closing-disclaimer"]', signal));
+        const actionsStarted = Date.now();
+        const actionsPromise = runSceneActions(scene.id, signal);
+        const results = await Promise.all([actionsPromise, narration.started]);
+        const audioStarted = results[1];
+        const actionsMs = Date.now() - actionsStarted;
+        const audioEnded = audioStarted ? await narration.ended : false;
+        if (!audioEnded) await wait(NO_AUDIO_FALLBACK_MS[index], signal);
+        const sceneMs = Date.now() - sceneStarted;
+        if (process.env.NODE_ENV === "development") {
+          console.info(`[MedClear demo] ${scene.id}: total ${sceneMs} ms, actions ${actionsMs} ms, audio ${narration.durationMs()} ms${audioEnded ? "" : ", timed fallback"}`);
         }
-
-        const scriptedRemaining = SCENE_DURATIONS_MS[index] * PACE - (Date.now() - sceneStarted);
-        if (scriptedRemaining > 0) await wait(scriptedRemaining / PACE, signal);
-        await audioDone;
+        if (index < scenes.length - 1) await sleep(400, signal);
       }
     } catch (error) {
       if (!(error instanceof Error) || error.message !== "stopped") console.error("MedClear demo tour ended early", error);
     } finally {
       finish();
     }
-  }, [finish, focusOn, playNarration, preload, router, saveTour]);
+  }, [finish, playNarration, preload, runSceneActions, saveTour]);
 
   const start = useCallback(() => {
     if (runStartedRef.current) return;
