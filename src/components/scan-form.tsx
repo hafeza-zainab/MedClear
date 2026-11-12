@@ -34,7 +34,14 @@ export default function ScanForm() {
   const [preview, setPreview] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [cooldownSeconds, setCooldownSeconds] = useState(0);
   const [language, setLanguage] = useState("en");
+
+  useEffect(() => {
+    if (cooldownSeconds <= 0) return;
+    const timer = window.setTimeout(() => setCooldownSeconds((seconds) => Math.max(0, seconds - 1)), 1000);
+    return () => window.clearTimeout(timer);
+  }, [cooldownSeconds]);
 
   useEffect(() => {
     const savedLanguage = getLanguage(localStorage.getItem("medclear-language")).code;
@@ -85,6 +92,7 @@ export default function ScanForm() {
       router.push("/results");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Something went wrong. Please try again.");
+      setCooldownSeconds(15);
     } finally {
       setBusy(false);
     }
@@ -134,12 +142,13 @@ export default function ScanForm() {
           </button>
         </div>
       )}
-      <button className="try-button upload-submit" type="submit" disabled={!file || busy}>
-        {busy ? <><span className="spinner" aria-hidden="true" /> Reading your photo…</> : <>Explain this photo <span aria-hidden="true">→</span></>}
+      <button className="try-button upload-submit" type="submit" disabled={!file || busy || cooldownSeconds > 0}>
+        {busy ? <><span className="spinner" aria-hidden="true" /> Reading your photo…</> : cooldownSeconds > 0 ? `Try again in ${cooldownSeconds}s` : <>Explain this photo <span aria-hidden="true">→</span></>}
       </button>
       <div className="sample-divider"><span>or</span></div>
       <button className="sample-button" type="button" data-tour="sample-button" onClick={trySample}>Try a sample prescription</button>
       {busy && <p className="loading-note" role="status">This can take a few moments. Please keep this page open.</p>}
+      {!busy && cooldownSeconds > 0 && <p className="loading-note" role="status">Please wait {cooldownSeconds} seconds before trying again.</p>}
     </form>
   );
 }

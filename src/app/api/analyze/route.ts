@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { analysisSchema } from "@/lib/medical";
+import { createHash } from "node:crypto";
+import { analysisSchema, type Analysis } from "@/lib/medical";
 import { getChatCompletionsUrl, getLlmConfig, invalidModelJsonMessage, logUpstreamFailureDetails } from "@/lib/llm";
 import { getLanguage } from "@/lib/languages";
 
@@ -10,6 +11,90 @@ const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const DEFAULT_FALLBACK_MODEL = "gemini-3.7-flash";
 const DEFAULT_EMERGENCY_MODEL = "gemini-3.5-flash-lite";
+const INITIAL_MAX_TOKENS = 1200;
+const RETRY_MAX_TOKENS = 2400;
+const FOLLOW_UP_MAX_TOKENS = 1600;
+const MAX_UPSTREAM_CALLS = 3;
+const ANALYSIS_CACHE_LIMIT = 50;
+const ANALYSIS_CACHE_TTL_MS = 60 * 60 * 1000;
+
+const analysisCache = new Map<string, { createdAt: number; value: Analysis }>();
+
+function cleanExpiredCacheEntries(now = Date.now()) {
+  for (const [key, entry] of analysisCache) {
+    if (now - entry.createdAt >= ANALYSIS_CACHE_TTL_MS) analysisCache.delete(key);
+  }
+}
+
+function getCachedAnalysis(key: string): Analysis | undefined {
+  cleanExpiredCacheEntries();
+  const entry = analysisCache.get(key);
+  if (!entry) return undefined;
+  analysisCache.delete(key);
+  analysisCache.set(key, entry);
+  return entry.value;
+}
+
+function cacheAnalysis(key: string, value: Analysis) {
+  cleanExpiredCacheEntries();
+  while (analysisCache.size >= ANALYSIS_CACHE_LIMIT) {
+    const oldestKey = analysisCache.keys().next().value as string | undefined;
+    if (!oldestKey) break;
+    analysisCache.delete(oldestKey);
+  }
+  analysisCache.set(key, { createdAt: Date.now(), value });
+}
+
+function extractFirstJsonObject(text: string): string | undefined {
+  const unfenced = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "").trim();
+  const start = unfenced.indexOf("{");
+  if (start < 0) return undefined;
+
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let index = start; index < unfenced.length; index += 1) {
+    const character = unfenced[index];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (character === "\\") escaped = true;
+      else if (character === '"') inString = false;
+      continue;
+    }
+    if (character === '"') inString = true;
+    else if (character === "{") depth += 1;
+    else if (character === "}") {
+      depth -= 1;
+      if (depth === 0) return unfenced.slice(start, index + 1);
+    }
+  }
+  return undefined;
+}
+
+function logAnalysisOutputProblem(
+  model: string,
+  finishReason: string | null,
+  content: string,
+  issues: Array<{ path: PropertyKey[]; message: string }> = [],
+  responseLength = content.length,
+) {
+  console.error("[MedClear] analyze output parse/validation failed", {
+    model,
+    finish_reason: finishReason,
+    response_length: responseLength,
+    wrapped_in_code_fences: /^\s*```/.test(content) && /```\s*$/.test(content),
+    zod_issues: issues.map((issue) => ({ path: issue.path.map(String).join("."), message: issue.message })),
+  });
+}
+
+function parseRetryAfter(response: Response): number | undefined {
+  const header = response.headers.get("retry-after");
+  if (!header) return undefined;
+  const seconds = Number(header);
+  if (Number.isFinite(seconds)) return Math.max(0, seconds * 1000);
+  const date = Date.parse(header);
+  return Number.isNaN(date) ? undefined : Math.max(0, date - Date.now());
+}
 
 function matchesImageType(type: string, bytes: Buffer) {
   if (type === "image/jpeg") return bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
@@ -40,7 +125,8 @@ export async function POST(request: Request) {
 
   const image = formData.get("image");
   const language = formData.get("language");
-  const languageName = getLanguage(language).promptName;
+  const languageSetting = getLanguage(language);
+  const languageName = languageSetting.promptName;
   if (!(image instanceof File)) {
     return NextResponse.json({ error: "Choose a prescription or medicine photo first." }, { status: 400 });
   }
@@ -55,25 +141,40 @@ export async function POST(request: Request) {
   if (!matchesImageType(image.type, bytes)) {
     return NextResponse.json({ error: "This file doesn't look like a supported image. Choose a clear JPG, PNG, or WebP photo." }, { status: 400 });
   }
+  const cacheKey = createHash("sha256")
+    .update(bytes)
+    .update("\0")
+    .update(languageSetting.code)
+    .digest("hex");
+  const cached = getCachedAnalysis(cacheKey);
+  if (cached) return NextResponse.json(cached);
+
   const imageData = `data:${image.type};base64,${bytes.toString("base64")}`;
 
   try {
-    const messages = [
-          {
-            role: "system",
-            content:
-              `You read medicine labels and prescriptions and return plain-language information. Never diagnose or replace a doctor. Never invent medicine names, strengths, doses, frequency, timing, or duration that are not clearly visible. If a field is uncertain or unreadable, use an empty string (or 0 for frequency) and describe the uncertain part in unreadable_parts. Keep medicine names in English exactly as printed. Write all explanations in ${languageName}. Explain cautiously and tell the user to confirm all instructions with a doctor or pharmacist. Return only valid JSON matching exactly this shape: {\"medicines\":[{\"name\":string,\"strength\":string,\"purpose\":string,\"how_to_take\":string,\"frequency_per_day\":number,\"timing\":string,\"duration\":string,\"common_side_effects\":string[],\"cautions\":string[]}],\"general_notes\":string[],\"unreadable_parts\":string[]}. Do not infer purpose or side effects from a brand name if uncertain; mark uncertainty instead.`,
-          },
-          {
-            role: "user",
-            content: [
-              { type: "text", text: "Read the visible medicine information in this image." },
-              { type: "image_url", image_url: { url: imageData } },
-            ],
-          },
-        ];
+    const systemPrompt = `Read only visible medicine information from this photo. Never diagnose or replace a doctor. Never invent medicine names, strengths, doses, timing, frequency, or duration. Keep medicine names in English and write explanations in ${languageName}. Put unclear details in unreadable_parts and use empty strings or 0 when a field cannot be read. Tell the user to confirm with a doctor or pharmacist. Return exactly one JSON object, no markdown, with this shape: {"medicines":[{"name":"","strength":"","purpose":"","how_to_take":"","frequency_per_day":0,"timing":"","duration":"","common_side_effects":[],"cautions":[]}],"general_notes":[],"unreadable_parts":[]}.`;
+    const initialMessages = [
+      { role: "system", content: systemPrompt },
+      {
+        role: "user",
+        content: [
+          { type: "text", text: "Read the visible medicine information in this image." },
+          { type: "image_url", image_url: { url: imageData } },
+        ],
+      },
+    ];
 
-    function requestModel(requestedModel: string, timeoutMs: number) {
+    const modelAttempts = [model, fallbackModel, emergencyModel]
+      .filter((candidate, index, all) => all.indexOf(candidate) === index);
+    const modelTimeouts = [20_000, 35_000, 25_000];
+    const requestDeadline = Date.now() + 80_000;
+    let upstreamCalls = 0;
+
+    async function requestModel(requestedModel: string, modelIndex: number, messages: unknown[], maxTokens: number) {
+      if (upstreamCalls >= MAX_UPSTREAM_CALLS) throw new Error("Analyze upstream call limit reached");
+      const remainingMs = requestDeadline - Date.now();
+      if (remainingMs <= 0) throw new DOMException("Analyze request time budget exhausted", "TimeoutError");
+      upstreamCalls += 1;
       const isFlashLite = requestedModel.includes("flash-lite");
       return fetch(getChatCompletionsUrl(), {
         method: "POST",
@@ -84,83 +185,131 @@ export async function POST(request: Request) {
         body: JSON.stringify({
           model: requestedModel,
           ...(!isFlashLite ? { reasoning_effort: "low" } : {}),
+          max_tokens: maxTokens,
           messages,
         }),
-        signal: AbortSignal.timeout(timeoutMs),
+        signal: AbortSignal.timeout(Math.min(modelTimeouts[modelIndex] ?? 20_000, remainingMs)),
       });
     }
 
-    // Try increasingly fast vision models when Gemini reports overload or a timeout.
-    const modelAttempts = [
-      { name: model, timeoutMs: 20_000 },
-      { name: fallbackModel, timeoutMs: 35_000 },
-      { name: emergencyModel, timeoutMs: 25_000 },
-    ].filter((candidate, index, all) => all.findIndex((item) => item.name === candidate.name) === index);
-    let responseModel = modelAttempts[0].name;
-    let response: Response | undefined;
-    for (let index = 0; index < modelAttempts.length; index += 1) {
-      const candidate = modelAttempts[index];
-      responseModel = candidate.name;
-      try {
-        response = await requestModel(candidate.name, candidate.timeoutMs);
-      } catch (error) {
-        const timedOut = error instanceof Error && error.name === "TimeoutError";
-        if (!timedOut || index === modelAttempts.length - 1) throw error;
-        console.warn(`[MedClear] analyze model ${candidate.name} timed out; trying ${modelAttempts[index + 1].name}`);
-        continue;
+    async function requestWithFallback(messages: unknown[], maxTokens: number, startIndex = 0) {
+      let last: { response: Response; model: string; modelIndex: number } | undefined;
+      for (let index = startIndex; index < modelAttempts.length && upstreamCalls < MAX_UPSTREAM_CALLS; index += 1) {
+        const requestedModel = modelAttempts[index];
+        const response = await requestModel(requestedModel, index, messages, maxTokens);
+        last = { response, model: requestedModel, modelIndex: index };
+        const canFallback = (response.status === 429 || response.status >= 500)
+          && index < modelAttempts.length - 1
+          && upstreamCalls < MAX_UPSTREAM_CALLS;
+        if (!canFallback) return last;
+
+        if (response.status === 429) {
+          const retryAfterMs = parseRetryAfter(response);
+          if (retryAfterMs !== undefined) {
+            const remainingMs = requestDeadline - Date.now();
+            if (retryAfterMs >= remainingMs) return last;
+            await new Promise((resolve) => setTimeout(resolve, retryAfterMs));
+          }
+        }
+        console.warn(`[MedClear] analyze model ${requestedModel} returned HTTP ${response.status}; trying ${modelAttempts[index + 1]}`);
+        await response.arrayBuffer().catch(() => new ArrayBuffer(0));
       }
-
-      const shouldTryAnotherModel = response.status >= 500 || response.status === 429;
-      if (!shouldTryAnotherModel || index === modelAttempts.length - 1) break;
-      const nextModel = modelAttempts[index + 1].name;
-      console.warn(`[MedClear] analyze model ${candidate.name} returned HTTP ${response.status}; trying ${nextModel}`);
-      await response.arrayBuffer();
+      if (!last) throw new Error("Analyze upstream call limit reached");
+      return last;
     }
 
-    if (!response) throw new Error("No model response was received");
-    if (!response.ok) {
-      const failure = await logUpstreamFailureDetails(`analyze model=${responseModel}`, response, apiKey);
-      const diagnostics = process.env.NODE_ENV === "development"
-        && request.headers.get("x-medclear-test-diagnostics") === "true"
-        ? { upstreamStatus: failure.status, upstreamBody: failure.body }
+    async function readModelOutput(response: Response) {
+      const bodyText = await response.text();
+      let completion: unknown;
+      try {
+        completion = JSON.parse(bodyText);
+      } catch {
+        return { content: "", finishReason: null as string | null, responseLength: bodyText.length };
+      }
+      const choice = (completion as {
+        choices?: Array<{ finish_reason?: unknown; message?: { content?: unknown } }>;
+      })?.choices?.[0];
+      const rawContent = choice?.message?.content;
+      const content = typeof rawContent === "string"
+        ? rawContent
+        : Array.isArray(rawContent)
+          ? rawContent.map((part) => typeof part === "object" && part !== null && "text" in part && typeof part.text === "string" ? part.text : "").join("\n")
+          : "";
+      return {
+        content,
+        finishReason: typeof choice?.finish_reason === "string" ? choice.finish_reason : null,
+        responseLength: content.length || bodyText.length,
+      };
+    }
+
+    function parseAnalysis(content: string, usedModel: string, finishReason: string | null, responseLength: number) {
+      const jsonObject = extractFirstJsonObject(content);
+      if (!jsonObject) {
+        logAnalysisOutputProblem(usedModel, finishReason, content, [], responseLength);
+        return undefined;
+      }
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(jsonObject);
+      } catch {
+        logAnalysisOutputProblem(usedModel, finishReason, content, [], responseLength);
+        return undefined;
+      }
+      const validated = analysisSchema.safeParse(parsed);
+      if (!validated.success) {
+        logAnalysisOutputProblem(usedModel, finishReason, content, validated.error.issues, responseLength);
+        return undefined;
+      }
+      return validated.data;
+    }
+
+    async function providerFailure(result: { response: Response; model: string }) {
+      const failure = await logUpstreamFailureDetails(`analyze model=${result.model}`, result.response, apiKey!);
+      const headers = result.response.status === 429 && result.response.headers.has("retry-after")
+        ? { "Retry-After": result.response.headers.get("retry-after")! }
         : undefined;
-      return NextResponse.json(
-        { error: failure.message, ...(diagnostics ? { diagnostics } : {}) },
-        { status: response.status === 429 ? 429 : 502 },
-      );
+      return NextResponse.json({ error: failure.message }, {
+        status: result.response.status === 429 ? 429 : 502,
+        headers,
+      });
     }
 
-    let completion: unknown;
-    try {
-      completion = await response.json();
-    } catch {
-      console.error("[MedClear] analyze provider returned a non-JSON response", { model: responseModel });
-      return NextResponse.json({ error: invalidModelJsonMessage() }, { status: 502 });
-    }
-    const content = (completion as {
-      choices?: Array<{ message?: { content?: unknown } }>;
-    })?.choices?.[0]?.message?.content;
-    if (typeof content !== "string") {
-      console.error("[MedClear] analyze provider response had no text content", { model: responseModel });
-      return NextResponse.json({ error: invalidModelJsonMessage() }, { status: 502 });
-    }
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(content);
-    } catch {
-      console.error("[MedClear] analyze model returned invalid JSON", { model: responseModel });
-      return NextResponse.json({ error: invalidModelJsonMessage() }, { status: 502 });
-    }
-    const validated = analysisSchema.safeParse(parsed);
-    if (!validated.success) {
-      console.error("LLM returned invalid analysis JSON", validated.error.flatten());
-      return NextResponse.json(
-        { error: invalidModelJsonMessage() },
-        { status: 502 },
-      );
+    let result = await requestWithFallback(initialMessages, INITIAL_MAX_TOKENS);
+    if (!result.response.ok) return providerFailure(result);
+    let output = await readModelOutput(result.response);
+    let wasTruncated = /length|max_tokens/i.test(output.finishReason ?? "");
+
+    if (wasTruncated && upstreamCalls < MAX_UPSTREAM_CALLS) {
+      result = await requestWithFallback(initialMessages, RETRY_MAX_TOKENS, result.modelIndex);
+      if (!result.response.ok) return providerFailure(result);
+      output = await readModelOutput(result.response);
+      wasTruncated = /length|max_tokens/i.test(output.finishReason ?? "");
     }
 
-    return NextResponse.json(validated.data);
+    let analysis = parseAnalysis(output.content, result.model, output.finishReason, output.responseLength);
+    if (!analysis && upstreamCalls < MAX_UPSTREAM_CALLS) {
+      const repairSystem = `Return the same medicine information as one strict JSON object only, with no markdown. Preserve only facts already present; do not invent or infer. Keep medicine names in English, write explanations in ${languageName}, and place missing or unclear details in unreadable_parts. Use this shape: {"medicines":[{"name":"","strength":"","purpose":"","how_to_take":"","frequency_per_day":0,"timing":"","duration":"","common_side_effects":[],"cautions":[]}],"general_notes":[],"unreadable_parts":[]}.`;
+      const repairMessages = output.content
+        ? [
+          { role: "system", content: repairSystem },
+          { role: "user", content: `Convert this previous answer to the required JSON shape without adding facts:\n${output.content}` },
+        ]
+        : [
+          { role: "system", content: repairSystem },
+          initialMessages[1],
+        ];
+      result = await requestWithFallback(repairMessages, FOLLOW_UP_MAX_TOKENS, result.modelIndex);
+      if (!result.response.ok) return providerFailure(result);
+      output = await readModelOutput(result.response);
+      analysis = parseAnalysis(output.content, result.model, output.finishReason, output.responseLength);
+    }
+
+    if (!analysis) return NextResponse.json({ error: invalidModelJsonMessage() }, { status: 502 });
+    if (wasTruncated) {
+      analysis.unreadable_parts.push("The AI response may have been cut short. Please confirm all details with your doctor or pharmacist.");
+    }
+    cacheAnalysis(cacheKey, analysis);
+    return NextResponse.json(analysis);
   } catch (error) {
     const errorName = error instanceof Error ? error.name : "UnknownError";
     const errorMessage = error instanceof Error ? error.message : "Unknown request failure";

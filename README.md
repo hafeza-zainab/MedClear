@@ -71,7 +71,7 @@ MedClear accepts a photo and asks a vision-capable language model to extract onl
 
 The routes call `{LLM_BASE_URL}/chat/completions`. Image input uses the OpenAI-compatible `image_url` content format with a base64 data URL. `LLM_BASE_URL` and `LLM_MODEL` are required; the server fails at startup with a clear error if either is missing.
 
-To diagnose the analyze request locally, start `npm run dev` and in another terminal run `node scripts/test-analyze-route.mjs`. The script sends a synthetic one-pixel JPEG and prints only the sanitized upstream status and response body; the diagnostics response is enabled only in development.
+To diagnose the analyze request locally, start `npm run dev` and in another terminal run `node scripts/test-analyze-route.mjs`. The script sends the fictional JPEG at `scripts/fixtures/test-prescription.jpg` and prints the parsed medicine count on success. On upstream failures it prints only the sanitized status and response body; route diagnostics are enabled only in development.
 
 ## Narrated demo audio
 

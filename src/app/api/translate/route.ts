@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { analysisSchema } from "@/lib/medical";
+import { analysisObjectSchema, analysisSchema } from "@/lib/medical";
 import { getChatCompletionsUrl, getLlmConfig, invalidModelJsonMessage, logUpstreamFailure } from "@/lib/llm";
 import { getLanguage, LANGUAGE_CODES } from "@/lib/languages";
 
 const languageSchema = z.enum(LANGUAGE_CODES);
-const requestSchema = analysisSchema.extend({ language: languageSchema });
+const requestSchema = analysisObjectSchema.extend({ language: languageSchema });
 
 export async function POST(request: Request) {
   const apiKey = process.env.LLM_API_KEY;
