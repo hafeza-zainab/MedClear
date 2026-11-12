@@ -508,6 +508,15 @@ h1 {
   width: 100%;
 }
 
+.form-error p {
+  margin: 0;
+}
+
+.error-sample-button {
+  margin-top: 12px;
+  width: 100%;
+}
+
 .loading-note {
   color: var(--muted);
   font-size: 13px;

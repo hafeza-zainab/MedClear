@@ -110,7 +110,8 @@ export async function POST(request: Request) {
         continue;
       }
 
-      if (response.status < 500 || index === modelAttempts.length - 1) break;
+      const shouldTryAnotherModel = response.status >= 500 || response.status === 429;
+      if (!shouldTryAnotherModel || index === modelAttempts.length - 1) break;
       const nextModel = modelAttempts[index + 1].name;
       console.warn(`[MedClear] analyze model ${candidate.name} returned HTTP ${response.status}; trying ${nextModel}`);
       await response.arrayBuffer();

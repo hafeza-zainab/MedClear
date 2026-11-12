@@ -126,7 +126,14 @@ export default function ScanForm() {
           aria-label="Choose or take a photo of a prescription or medicine strip"
         />
       </label>
-      {error && <p className="form-error" role="alert">{error}</p>}
+      {error && (
+        <div className="form-error" role="alert">
+          <p>{error}</p>
+          <button className="sample-button error-sample-button" type="button" onClick={trySample}>
+            Open sample results (no AI call)
+          </button>
+        </div>
+      )}
       <button className="try-button upload-submit" type="submit" disabled={!file || busy}>
         {busy ? <><span className="spinner" aria-hidden="true" /> Reading your photo…</> : <>Explain this photo <span aria-hidden="true">→</span></>}
       </button>
