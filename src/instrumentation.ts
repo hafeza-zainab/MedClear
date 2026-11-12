@@ -38,6 +38,10 @@ export async function register() {
     const fallbackSource = process.env.LLM_FALLBACK_MODEL?.trim()
       ? sourceFor("LLM_FALLBACK_MODEL", readFileSync)
       : "built-in default";
-    console.info(`[MedClear] LLM configuration: model=${model} (source=${sourceFor("LLM_MODEL", readFileSync)}), baseUrl=${baseUrl} (source=${sourceFor("LLM_BASE_URL", readFileSync)}), fallbackModel=${fallbackModel} (source=${fallbackSource})`);
+    const emergencyModel = process.env.LLM_EMERGENCY_MODEL?.trim() || "gemini-3.5-flash-lite";
+    const emergencySource = process.env.LLM_EMERGENCY_MODEL?.trim()
+      ? sourceFor("LLM_EMERGENCY_MODEL", readFileSync)
+      : "built-in default";
+    console.info(`[MedClear] LLM configuration: model=${model} (source=${sourceFor("LLM_MODEL", readFileSync)}), baseUrl=${baseUrl} (source=${sourceFor("LLM_BASE_URL", readFileSync)}), fallbackModel=${fallbackModel} (source=${fallbackSource}), emergencyModel=${emergencyModel} (source=${emergencySource})`);
   }
 }

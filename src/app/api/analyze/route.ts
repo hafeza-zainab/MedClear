@@ -4,11 +4,12 @@ import { getChatCompletionsUrl, getLlmConfig, invalidModelJsonMessage, logUpstre
 import { getLanguage } from "@/lib/languages";
 
 export const runtime = "nodejs";
-export const maxDuration = 75;
+export const maxDuration = 85;
 
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const DEFAULT_FALLBACK_MODEL = "gemini-3.7-flash";
+const DEFAULT_EMERGENCY_MODEL = "gemini-3.5-flash-lite";
 
 function matchesImageType(type: string, bytes: Buffer) {
   if (type === "image/jpeg") return bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
@@ -21,6 +22,7 @@ export async function POST(request: Request) {
   const apiKey = process.env.LLM_API_KEY;
   const { model } = getLlmConfig();
   const fallbackModel = process.env.LLM_FALLBACK_MODEL?.trim() || DEFAULT_FALLBACK_MODEL;
+  const emergencyModel = process.env.LLM_EMERGENCY_MODEL?.trim() || DEFAULT_EMERGENCY_MODEL;
 
   if (!apiKey || !model) {
     return NextResponse.json(
@@ -72,36 +74,49 @@ export async function POST(request: Request) {
         ];
 
     function requestModel(requestedModel: string, timeoutMs: number) {
+      const isFlashLite = requestedModel.includes("flash-lite");
       return fetch(getChatCompletionsUrl(), {
         method: "POST",
         headers: {
           Authorization: `Bearer ${apiKey}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ model: requestedModel, reasoning_effort: "low", messages }),
+        body: JSON.stringify({
+          model: requestedModel,
+          ...(!isFlashLite ? { reasoning_effort: "low" } : {}),
+          messages,
+        }),
         signal: AbortSignal.timeout(timeoutMs),
       });
     }
 
-    // Reserve time for the fallback instead of spending the whole route budget
-    // repeating a model that Gemini has already marked unavailable.
-    let responseModel = model;
-    let response: Response;
-    try {
-      response = await requestModel(model, 25_000);
-    } catch (error) {
-      const timedOut = error instanceof Error && error.name === "TimeoutError";
-      if (!timedOut || fallbackModel === model) throw error;
-      console.warn(`[MedClear] analyze model ${model} timed out; trying fallback model ${fallbackModel}`);
-      responseModel = fallbackModel;
-      response = await requestModel(fallbackModel, 45_000);
-    }
-    if (response.status === 503 && fallbackModel !== model && responseModel === model) {
-      console.warn(`[MedClear] analyze model ${model} returned HTTP 503; trying fallback model ${fallbackModel}`);
-      responseModel = fallbackModel;
-      response = await requestModel(fallbackModel, 45_000);
+    // Try increasingly fast vision models when Gemini reports overload or a timeout.
+    const modelAttempts = [
+      { name: model, timeoutMs: 20_000 },
+      { name: fallbackModel, timeoutMs: 35_000 },
+      { name: emergencyModel, timeoutMs: 25_000 },
+    ].filter((candidate, index, all) => all.findIndex((item) => item.name === candidate.name) === index);
+    let responseModel = modelAttempts[0].name;
+    let response: Response | undefined;
+    for (let index = 0; index < modelAttempts.length; index += 1) {
+      const candidate = modelAttempts[index];
+      responseModel = candidate.name;
+      try {
+        response = await requestModel(candidate.name, candidate.timeoutMs);
+      } catch (error) {
+        const timedOut = error instanceof Error && error.name === "TimeoutError";
+        if (!timedOut || index === modelAttempts.length - 1) throw error;
+        console.warn(`[MedClear] analyze model ${candidate.name} timed out; trying ${modelAttempts[index + 1].name}`);
+        continue;
+      }
+
+      if (response.status < 500 || index === modelAttempts.length - 1) break;
+      const nextModel = modelAttempts[index + 1].name;
+      console.warn(`[MedClear] analyze model ${candidate.name} returned HTTP ${response.status}; trying ${nextModel}`);
+      await response.arrayBuffer();
     }
 
+    if (!response) throw new Error("No model response was received");
     if (!response.ok) {
       const failure = await logUpstreamFailureDetails(`analyze model=${responseModel}`, response, apiKey);
       const diagnostics = process.env.NODE_ENV === "development"

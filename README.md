@@ -48,6 +48,7 @@ MedClear accepts a photo and asks a vision-capable language model to extract onl
    LLM_MODEL=gemini-3.8-flash
    LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
    LLM_FALLBACK_MODEL=gemini-3.7-flash
+   LLM_EMERGENCY_MODEL=gemini-3.5-flash-lite
    ```
 
 4. Start the development server:
@@ -65,7 +66,8 @@ MedClear accepts a photo and asks a vision-capable language model to extract onl
 | `LLM_API_KEY` | Yes for live AI features | API credential read only by server routes. Never prefix it with `NEXT_PUBLIC_`. |
 | `LLM_MODEL` | Yes | Vision-capable model name. It must accept image inputs and follow JSON output instructions. |
 | `LLM_BASE_URL` | Yes | Provider API base URL. For Gemini's OpenAI-compatible API, use `https://generativelanguage.googleapis.com/v1beta/openai`. |
-| `LLM_FALLBACK_MODEL` | No | Vision-capable fallback used by `/api/analyze` when the primary model returns HTTP 503. Defaults to `gemini-3.7-flash`. |
+| `LLM_FALLBACK_MODEL` | No | First vision fallback for `/api/analyze` after a primary-model timeout or HTTP 5xx. Defaults to `gemini-3.7-flash`. |
+| `LLM_EMERGENCY_MODEL` | No | Final vision fallback after another timeout or HTTP 5xx. Defaults to `gemini-3.5-flash-lite`, a low-latency multimodal model. |
 
 The routes call `{LLM_BASE_URL}/chat/completions`. Image input uses the OpenAI-compatible `image_url` content format with a base64 data URL. `LLM_BASE_URL` and `LLM_MODEL` are required; the server fails at startup with a clear error if either is missing.
 
