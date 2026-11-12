@@ -5,12 +5,15 @@ import { getChatCompletionsUrl, getLlmConfig, invalidModelJsonMessage, logUpstre
 import { getLanguage } from "@/lib/languages";
 
 export const runtime = "nodejs";
-export const maxDuration = 85;
+// Render web services support long-running HTTP responses; the route itself stops
+// upstream work at 70 seconds so the app can return its own friendly timeout.
+export const maxDuration = 75;
 
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
-const DEFAULT_FALLBACK_MODEL = "gemini-3.7-flash";
-const DEFAULT_EMERGENCY_MODEL = "gemini-3.5-flash-lite";
+const DEFAULT_FALLBACK_MODELS = ["gemini-3.6-flash", "gemini-3.8-flash"];
+const PER_CALL_TIMEOUT_MS = 40_000;
+const TOTAL_SCAN_TIMEOUT_MS = 70_000;
 const INITIAL_MAX_TOKENS = 1200;
 const RETRY_MAX_TOKENS = 2400;
 const FOLLOW_UP_MAX_TOKENS = 1600;
@@ -19,6 +22,7 @@ const ANALYSIS_CACHE_LIMIT = 50;
 const ANALYSIS_CACHE_TTL_MS = 60 * 60 * 1000;
 
 const analysisCache = new Map<string, { createdAt: number; value: Analysis }>();
+const modelsWithoutReasoningEffort = new Set<string>();
 
 function cleanExpiredCacheEntries(now = Date.now()) {
   for (const [key, entry] of analysisCache) {
@@ -106,8 +110,8 @@ function matchesImageType(type: string, bytes: Buffer) {
 export async function POST(request: Request) {
   const apiKey = process.env.LLM_API_KEY;
   const { model } = getLlmConfig();
-  const fallbackModel = process.env.LLM_FALLBACK_MODEL?.trim() || DEFAULT_FALLBACK_MODEL;
-  const emergencyModel = process.env.LLM_EMERGENCY_MODEL?.trim() || DEFAULT_EMERGENCY_MODEL;
+  const fallbackModels = (process.env.LLM_FALLBACK_MODELS || DEFAULT_FALLBACK_MODELS.join(","))
+    .split(",").map((candidate) => candidate.trim()).filter(Boolean);
 
   if (!apiKey || !model) {
     return NextResponse.json(
@@ -152,7 +156,7 @@ export async function POST(request: Request) {
   const imageData = `data:${image.type};base64,${bytes.toString("base64")}`;
 
   try {
-    const systemPrompt = `Read only visible medicine information from this photo. Never diagnose or replace a doctor. Never invent medicine names, strengths, doses, timing, frequency, or duration. Keep medicine names in English and write explanations in ${languageName}. Put unclear details in unreadable_parts and use empty strings or 0 when a field cannot be read. Tell the user to confirm with a doctor or pharmacist. Return exactly one JSON object, no markdown, with this shape: {"medicines":[{"name":"","strength":"","purpose":"","how_to_take":"","frequency_per_day":0,"timing":"","duration":"","common_side_effects":[],"cautions":[]}],"general_notes":[],"unreadable_parts":[]}.`;
+    const systemPrompt = `Extract only clearly visible medicine facts. Never diagnose, prescribe, infer, or invent names or instructions. Keep medicine names in English; write explanations in ${languageName}. Use concise phrases: purpose at most 15 words, how_to_take at most 20 words, up to 3 side effects and 3 cautions, each at most 10 words. Use empty strings, 0, and empty arrays for missing details; record unclear text in unreadable_parts. Tell the user to confirm with a doctor or pharmacist. Return only this JSON, no prose or markdown: {"medicines":[{"name":"","strength":"","purpose":"","how_to_take":"","frequency_per_day":0,"timing":"","duration":"","common_side_effects":[],"cautions":[]}],"general_notes":[],"unreadable_parts":[]}.`;
     const initialMessages = [
       { role: "system", content: systemPrompt },
       {
@@ -164,39 +168,92 @@ export async function POST(request: Request) {
       },
     ];
 
-    const modelAttempts = [model, fallbackModel, emergencyModel]
+    const modelAttempts = [model, ...fallbackModels]
       .filter((candidate, index, all) => all.indexOf(candidate) === index);
-    const modelTimeouts = [20_000, 35_000, 25_000];
-    const requestDeadline = Date.now() + 80_000;
+    const requestDeadline = Date.now() + TOTAL_SCAN_TIMEOUT_MS;
     let upstreamCalls = 0;
 
-    async function requestModel(requestedModel: string, modelIndex: number, messages: unknown[], maxTokens: number) {
+    async function requestModel(requestedModel: string, messages: unknown[], maxTokens: number, useReasoningEffort: boolean) {
       if (upstreamCalls >= MAX_UPSTREAM_CALLS) throw new Error("Analyze upstream call limit reached");
       const remainingMs = requestDeadline - Date.now();
       if (remainingMs <= 0) throw new DOMException("Analyze request time budget exhausted", "TimeoutError");
       upstreamCalls += 1;
-      const isFlashLite = requestedModel.includes("flash-lite");
-      return fetch(getChatCompletionsUrl(), {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
+      const startedAt = Date.now();
+      let finishReason: string | null = null;
+      try {
+        const response = await fetch(getChatCompletionsUrl(), {
+          method: "POST",
+          headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: requestedModel,
+            ...(useReasoningEffort && !modelsWithoutReasoningEffort.has(requestedModel)
+              ? { reasoning_effort: requestedModel.includes("flash-lite") ? "minimal" : "low" }
+              : {}),
+            max_tokens: maxTokens,
+            messages,
+          }),
+          signal: AbortSignal.timeout(Math.min(PER_CALL_TIMEOUT_MS, remainingMs)),
+        });
+        try {
+          const body = await response.clone().json() as { choices?: Array<{ finish_reason?: unknown }> };
+          finishReason = typeof body.choices?.[0]?.finish_reason === "string" ? body.choices[0].finish_reason : null;
+        } catch { /* Keep timing logs useful even when the upstream body is malformed. */ }
+        console.info("[MedClear] analyze upstream call", {
           model: requestedModel,
-          ...(!isFlashLite ? { reasoning_effort: "low" } : {}),
-          max_tokens: maxTokens,
-          messages,
-        }),
-        signal: AbortSignal.timeout(Math.min(modelTimeouts[modelIndex] ?? 20_000, remainingMs)),
-      });
+          image_bytes: bytes.length,
+          elapsed_ms: Date.now() - startedAt,
+          finish_reason: finishReason,
+          timed_out: false,
+        });
+        return response;
+      } catch (error) {
+        const timedOut = error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError");
+        console.info("[MedClear] analyze upstream call", {
+          model: requestedModel,
+          image_bytes: bytes.length,
+          elapsed_ms: Date.now() - startedAt,
+          finish_reason: finishReason,
+          timed_out: timedOut,
+        });
+        throw error;
+      }
     }
 
     async function requestWithFallback(messages: unknown[], maxTokens: number, startIndex = 0) {
       let last: { response: Response; model: string; modelIndex: number } | undefined;
+      let lastTimeout: unknown;
       for (let index = startIndex; index < modelAttempts.length && upstreamCalls < MAX_UPSTREAM_CALLS; index += 1) {
         const requestedModel = modelAttempts[index];
-        const response = await requestModel(requestedModel, index, messages, maxTokens);
+        let response: Response;
+        try {
+          response = await requestModel(requestedModel, messages, maxTokens, true);
+        } catch (error) {
+          if (!(error instanceof Error) || (error.name !== "TimeoutError" && error.name !== "AbortError")) throw error;
+          lastTimeout = error;
+          if (index + 1 < modelAttempts.length && upstreamCalls < MAX_UPSTREAM_CALLS && Date.now() < requestDeadline) {
+            console.warn(`[MedClear] analyze model ${requestedModel} timed out; immediately trying ${modelAttempts[index + 1]}`);
+            continue;
+          }
+          throw error;
+        }
+        if (response.status === 400 && !modelsWithoutReasoningEffort.has(requestedModel) && upstreamCalls < MAX_UPSTREAM_CALLS) {
+          const body = await response.clone().text().catch(() => "");
+          if (/reasoning_effort|thinking_level|thinking budget/i.test(body)) {
+            modelsWithoutReasoningEffort.add(requestedModel);
+            console.warn(`[MedClear] analyze model ${requestedModel} rejected reasoning_effort; retrying once without it`);
+            try {
+              response = await requestModel(requestedModel, messages, maxTokens, false);
+            } catch (error) {
+              if (!(error instanceof Error) || (error.name !== "TimeoutError" && error.name !== "AbortError")) throw error;
+              lastTimeout = error;
+              if (index + 1 < modelAttempts.length && upstreamCalls < MAX_UPSTREAM_CALLS && Date.now() < requestDeadline) {
+                console.warn(`[MedClear] analyze model ${requestedModel} timed out without reasoning_effort; immediately trying ${modelAttempts[index + 1]}`);
+                continue;
+              }
+              throw error;
+            }
+          }
+        }
         last = { response, model: requestedModel, modelIndex: index };
         const canFallback = (response.status === 429 || response.status >= 500)
           && index < modelAttempts.length - 1
@@ -212,9 +269,11 @@ export async function POST(request: Request) {
           }
         }
         console.warn(`[MedClear] analyze model ${requestedModel} returned HTTP ${response.status}; trying ${modelAttempts[index + 1]}`);
-        await response.arrayBuffer().catch(() => new ArrayBuffer(0));
       }
-      if (!last) throw new Error("Analyze upstream call limit reached");
+      if (!last) {
+        if (lastTimeout) throw lastTimeout;
+        throw new Error("Analyze upstream call limit reached");
+      }
       return last;
     }
 
@@ -288,7 +347,7 @@ export async function POST(request: Request) {
 
     let analysis = parseAnalysis(output.content, result.model, output.finishReason, output.responseLength);
     if (!analysis && upstreamCalls < MAX_UPSTREAM_CALLS) {
-      const repairSystem = `Return the same medicine information as one strict JSON object only, with no markdown. Preserve only facts already present; do not invent or infer. Keep medicine names in English, write explanations in ${languageName}, and place missing or unclear details in unreadable_parts. Use this shape: {"medicines":[{"name":"","strength":"","purpose":"","how_to_take":"","frequency_per_day":0,"timing":"","duration":"","common_side_effects":[],"cautions":[]}],"general_notes":[],"unreadable_parts":[]}.`;
+      const repairSystem = `Return only one concise JSON object with no prose or markdown. Preserve visible facts only; never invent. Keep medicine names in English, write explanations in ${languageName}. purpose max 15 words, how_to_take max 20 words, up to 3 side effects and cautions, each max 10 words. Put unclear details in unreadable_parts. Shape: {"medicines":[{"name":"","strength":"","purpose":"","how_to_take":"","frequency_per_day":0,"timing":"","duration":"","common_side_effects":[],"cautions":[]}],"general_notes":[],"unreadable_parts":[]}.`;
       const repairMessages = output.content
         ? [
           { role: "system", content: repairSystem },

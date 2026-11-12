@@ -18,11 +18,22 @@ function coerceFrequency(value: unknown): number {
   return Number.isInteger(candidate) && candidate >= 0 && candidate <= 24 ? candidate : 0;
 }
 
+function limitWords(value: string, maximum: number): string {
+  const words = value.trim().split(/\s+/).filter(Boolean);
+  return words.length > maximum ? words.slice(0, maximum).join(" ") : value;
+}
+
 const stringSchema = z.preprocess(coerceString, z.string());
+const purposeSchema = z.preprocess(coerceString, z.string()).transform((value) => limitWords(value, 15));
+const howToTakeSchema = z.preprocess(coerceString, z.string()).transform((value) => limitWords(value, 20));
 const stringArraySchema = z.preprocess((value) => {
   if (!Array.isArray(value)) return [];
   return value.map(coerceString).filter(Boolean);
 }, z.array(z.string()).default([]));
+const conciseListSchema = z.preprocess((value) => {
+  if (!Array.isArray(value)) return [];
+  return value.map(coerceString).filter(Boolean).slice(0, 3);
+}, z.array(z.string().transform((value) => limitWords(value, 10))).default([]));
 const frequencySchema = z.preprocess(coerceFrequency, z.number().int().min(0).max(24));
 
 export const medicineSchema = z.preprocess((value) => {
@@ -42,13 +53,13 @@ export const medicineSchema = z.preprocess((value) => {
 }, z.object({
   name: stringSchema,
   strength: stringSchema,
-  purpose: stringSchema,
-  how_to_take: stringSchema,
+  purpose: purposeSchema,
+  how_to_take: howToTakeSchema,
   frequency_per_day: frequencySchema,
   timing: stringSchema,
   duration: stringSchema,
-  common_side_effects: stringArraySchema,
-  cautions: stringArraySchema,
+  common_side_effects: conciseListSchema,
+  cautions: conciseListSchema,
 }));
 
 function normalizeAnalysis(value: unknown) {

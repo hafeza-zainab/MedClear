@@ -14,7 +14,7 @@ MedClear accepts a photo and asks a vision-capable language model to extract onl
 
 ## Features
 
-- Upload or take a prescription/medicine photo, with a preview and client-side resize to a maximum 1600 px edge.
+- Upload or take a prescription/medicine photo, with a preview and client-side resize to a maximum 1024 px edge and about 1 MB.
 - Server-side image analysis with schema-validated JSON output.
 - Medicine cards for purpose, visible instructions, common side effects, cautions, and unreadable parts.
 - English, Spanish, and French explanation choices. Medicine names remain in English.
@@ -45,10 +45,9 @@ MedClear accepts a photo and asks a vision-capable language model to extract onl
 
    ```dotenv
    LLM_API_KEY=your_api_key
-   LLM_MODEL=gemini-3.8-flash
+   LLM_MODEL=gemini-3.5-flash-lite
    LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
-   LLM_FALLBACK_MODEL=gemini-3.7-flash
-   LLM_EMERGENCY_MODEL=gemini-3.5-flash-lite
+   LLM_FALLBACK_MODELS=gemini-3.6-flash,gemini-3.8-flash
    ```
 
 4. Start the development server:
@@ -66,8 +65,9 @@ MedClear accepts a photo and asks a vision-capable language model to extract onl
 | `LLM_API_KEY` | Yes for live AI features | API credential read only by server routes. Never prefix it with `NEXT_PUBLIC_`. |
 | `LLM_MODEL` | Yes | Vision-capable model name. It must accept image inputs and follow JSON output instructions. |
 | `LLM_BASE_URL` | Yes | Provider API base URL. For Gemini's OpenAI-compatible API, use `https://generativelanguage.googleapis.com/v1beta/openai`. |
-| `LLM_FALLBACK_MODEL` | No | First vision fallback for `/api/analyze` after a primary-model timeout or HTTP 5xx. Defaults to `gemini-3.7-flash`. |
-| `LLM_EMERGENCY_MODEL` | No | Final vision fallback after another timeout or HTTP 5xx. Defaults to `gemini-3.5-flash-lite`, a low-latency multimodal model. |
+| `LLM_FALLBACK_MODELS` | No | Comma-separated vision fallbacks for `/api/analyze`, tried in order after a primary-model timeout or HTTP 429/5xx. Defaults to `gemini-3.6-flash,gemini-3.8-flash`. The primary `gemini-3.5-flash-lite` is the low-latency first choice; the route makes no more than three upstream calls per scan. |
+
+Analysis requests use up to 40 seconds per upstream call and a 70-second total budget. Render web services support long-running HTTP responses (up to 100 minutes), so Render's proxy timeout is not shorter than this route budget. The request logs show the model, resized image byte count, elapsed time, finish reason, and timeout status; they never include the API key or image bytes.
 
 The routes call `{LLM_BASE_URL}/chat/completions`. Image input uses the OpenAI-compatible `image_url` content format with a base64 data URL. `LLM_BASE_URL` and `LLM_MODEL` are required; the server fails at startup with a clear error if either is missing.
 

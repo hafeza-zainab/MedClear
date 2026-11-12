@@ -7,7 +7,8 @@ import { getLanguage, LANGUAGES } from "@/lib/languages";
 
 const ACCEPTED = ["image/jpeg", "image/png", "image/webp"];
 const MAX_FILE_BYTES = 20 * 1024 * 1024;
-const MAX_DIMENSION = 1600;
+const MAX_DIMENSION = 1024;
+const MAX_RESIZED_BYTES = 1_000_000;
 
 async function resizeImage(file: File): Promise<Blob> {
   const bitmap = await createImageBitmap(file);
@@ -18,14 +19,28 @@ async function resizeImage(file: File): Promise<Blob> {
   const context = canvas.getContext("2d");
   if (!context) throw new Error("This browser couldn't prepare the image.");
   context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  bitmap.close();
-  return new Promise((resolve, reject) => {
+  const toJpeg = (quality: number) => new Promise<Blob>((resolve, reject) => {
     canvas.toBlob((blob) => {
       if (!blob) return reject(new Error("Couldn't prepare the image. Please try another photo."));
       if (blob.type !== "image/jpeg") return reject(new Error("This browser couldn't convert the photo to JPEG. Try another image."));
       resolve(blob);
-    }, "image/jpeg", 0.88);
+    }, "image/jpeg", quality);
   });
+  let quality = 0.8;
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    const blob = await toJpeg(quality);
+    if (blob.size <= MAX_RESIZED_BYTES) { bitmap.close(); return blob; }
+    if (quality > 0.62) quality = Math.max(0.62, quality - 0.08);
+    else {
+      canvas.width = Math.max(1, Math.round(canvas.width * 0.85));
+      canvas.height = Math.max(1, Math.round(canvas.height * 0.85));
+      context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    }
+  }
+  const finalBlob = await toJpeg(0.62);
+  bitmap.close();
+  if (finalBlob.size > MAX_RESIZED_BYTES) throw new Error("This photo is too detailed to prepare under 1 MB. Please choose a smaller photo.");
+  return finalBlob;
 }
 
 export default function ScanForm() {
@@ -143,11 +158,11 @@ export default function ScanForm() {
         </div>
       )}
       <button className="try-button upload-submit" type="submit" disabled={!file || busy || cooldownSeconds > 0}>
-        {busy ? <><span className="spinner" aria-hidden="true" /> Reading your photo…</> : cooldownSeconds > 0 ? `Try again in ${cooldownSeconds}s` : <>Explain this photo <span aria-hidden="true">→</span></>}
+        {busy ? <><span className="spinner" aria-hidden="true" /> Reading your prescription…</> : cooldownSeconds > 0 ? `Try again in ${cooldownSeconds}s` : <>Explain this photo <span aria-hidden="true">→</span></>}
       </button>
       <div className="sample-divider"><span>or</span></div>
       <button className="sample-button" type="button" data-tour="sample-button" onClick={trySample}>Try a sample prescription</button>
-      {busy && <p className="loading-note" role="status">This can take a few moments. Please keep this page open.</p>}
+      {busy && <p className="loading-note" role="status">Reading your prescription, this can take up to 30 seconds. Please keep this page open.</p>}
       {!busy && cooldownSeconds > 0 && <p className="loading-note" role="status">Please wait {cooldownSeconds} seconds before trying again.</p>}
     </form>
   );
