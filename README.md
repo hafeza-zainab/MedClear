@@ -77,7 +77,7 @@ pip install -r requirements-dev.txt
 python scripts/generate_narration.py
 ```
 
-Generation requires Python, an internet connection, `edge-tts`, and `imageio-ffmpeg`. The generator trims leading and trailing silence with the bundled ffmpeg. It compares each scene's speech and voice hash with `public/audio/manifest.json`, regenerating missing or stale files; use `python scripts/generate_narration.py --force` to regenerate all scenes. The build logs a prominent warning when the manifest is stale. The default voice is `en-IN-NeerjaNeural` at `+8%`; edit `VOICE` and `RATE` at the top of the script. Use `edge-tts --list-voices` to browse available voices. Run `python scripts/generate_narration.py --sample` to create comparison clips for three voices, or `python scripts/generate_narration.py --test-name` to compare app-name pronunciations in `public/audio/voice-samples/`.
+Generation requires Python, an internet connection, `edge-tts`, and `imageio-ffmpeg`. The generator trims leading and trailing silence while retaining about 150 ms at the end of each clip. It compares each scene's speech and voice hash with `public/audio/manifest.json`, regenerating missing or stale files; use `python scripts/generate_narration.py --force` to regenerate all scenes. The build logs a prominent warning when the manifest is stale. The default voice is `en-IN-NeerjaNeural` at its normal `+0%` rate; edit `VOICE` and `RATE` at the top of the script. Use `edge-tts --list-voices` to browse available voices. Run `python scripts/generate_narration.py --sample` to create comparison clips for three voices, or `python scripts/generate_narration.py --test-name` to compare app-name pronunciations in `public/audio/voice-samples/`.
 
 ## Limitations
 

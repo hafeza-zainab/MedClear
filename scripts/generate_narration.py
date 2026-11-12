@@ -15,8 +15,8 @@ from urllib.request import Request, urlopen
 
 # Change these defaults to configure generated narration. Use `edge-tts --list-voices` to browse.
 VOICE = "en-IN-NeerjaNeural"
-RATE = "+8%"
-SILENCE_FILTER = "silenceremove=start_periods=1:start_duration=0.05:start_threshold=-50dB,areverse,silenceremove=start_periods=1:start_duration=0.05:start_threshold=-50dB,areverse"
+RATE = "+0%"
+SILENCE_FILTER = "silenceremove=start_periods=1:start_duration=0.05:start_threshold=-50dB,areverse,silenceremove=start_periods=1:start_duration=0.05:start_threshold=-50dB,areverse,apad=pad_dur=0.15"
 
 PRONUNCIATIONS = {
     "MedClear": "Medd Clear",

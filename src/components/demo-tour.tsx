@@ -6,6 +6,7 @@ import scenes from "@/data/demo-scenes.json";
 import { getLanguage, LANGUAGES } from "@/lib/languages";
 
 const PACE = 1.25;
+const SCENE_GAP_MS = 700;
 const TOUR_KEY = "medclear-demo-tour-state";
 const MUTE_KEY = "medclear-demo-muted";
 const NO_AUDIO_FALLBACK_MS = [2200, 1700, 1200, 2000, 1500, 2200, 1700, 1700, 2200, 2000];
@@ -256,7 +257,7 @@ export default function DemoTour() {
       const language = await waitFor('[data-tour="language-switcher"]', signal);
       focusOn(language);
       selectValue(language, LANGUAGES[1].code);
-      await sleep(120, signal);
+      await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
       selectValue(language, LANGUAGES[2].code);
     } else {
       focusOn(await waitFor('[data-tour="closing-disclaimer"]', signal));
@@ -314,6 +315,7 @@ export default function DemoTour() {
           idleGapBeforeNextMs: null,
         });
         previousSceneFinishedAt = Date.now();
+        if (index < scenes.length - 1) await sleep(SCENE_GAP_MS, signal);
       }
     } catch (error) {
       if (!(error instanceof Error) || error.message !== "stopped") console.error("MedClear demo tour ended early", error);
