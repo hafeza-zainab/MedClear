@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { analysisSchema } from "@/lib/medical";
-import { getChatCompletionsUrl, getLlmConfig, invalidModelJsonMessage, logUpstreamFailure } from "@/lib/llm";
+import { getChatCompletionsUrl, getLlmConfig, invalidModelJsonMessage, logUpstreamFailureDetails } from "@/lib/llm";
 import { getLanguage } from "@/lib/languages";
 
 export const runtime = "nodejs";
@@ -72,7 +72,7 @@ export async function POST(request: Request) {
             role: "user",
             content: [
               { type: "text", text: "Read the visible medicine information in this image." },
-              { type: "image_url", image_url: { url: imageData, detail: "high" } },
+              { type: "image_url", image_url: { url: imageData } },
             ],
           },
         ],
@@ -81,9 +81,13 @@ export async function POST(request: Request) {
     });
 
     if (!response.ok) {
-      const error = await logUpstreamFailure("analyze", response, apiKey);
+      const failure = await logUpstreamFailureDetails("analyze", response, apiKey);
+      const diagnostics = process.env.NODE_ENV === "development"
+        && request.headers.get("x-medclear-test-diagnostics") === "true"
+        ? { upstreamStatus: failure.status, upstreamBody: failure.body }
+        : undefined;
       return NextResponse.json(
-        { error },
+        { error: failure.message, ...(diagnostics ? { diagnostics } : {}) },
         { status: response.status === 429 ? 429 : 502 },
       );
     }

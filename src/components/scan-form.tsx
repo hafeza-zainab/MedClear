@@ -20,7 +20,11 @@ async function resizeImage(file: File): Promise<Blob> {
   context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
   bitmap.close();
   return new Promise((resolve, reject) => {
-    canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("Couldn't prepare the image. Please try another photo.")), "image/jpeg", 0.88);
+    canvas.toBlob((blob) => {
+      if (!blob) return reject(new Error("Couldn't prepare the image. Please try another photo."));
+      if (blob.type !== "image/jpeg") return reject(new Error("This browser couldn't convert the photo to JPEG. Try another image."));
+      resolve(blob);
+    }, "image/jpeg", 0.88);
   });
 }
 

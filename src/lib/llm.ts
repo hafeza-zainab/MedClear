@@ -12,13 +12,17 @@ export function getChatCompletionsUrl() {
 }
 
 export async function logUpstreamFailure(route: string, response: Response, apiKey: string) {
+  return (await logUpstreamFailureDetails(route, response, apiKey)).message;
+}
+
+export async function logUpstreamFailureDetails(route: string, response: Response, apiKey: string) {
   const rawBody = await response.text().catch(() => "<response body unavailable>");
   const safeBody = rawBody
     .replaceAll(apiKey, "[REDACTED API KEY]")
     .replace(/data:image\/[a-z0-9.+-]+;base64,[a-z0-9+/=]+/gi, "[REDACTED IMAGE DATA]")
     .slice(0, 3000);
   console.error(`[MedClear] ${route} upstream failure: HTTP ${response.status}; response body: ${safeBody}`);
-  return userFacingProviderError(response.status);
+  return { message: userFacingProviderError(response.status), status: response.status, body: safeBody };
 }
 
 export function userFacingProviderError(status: number) {

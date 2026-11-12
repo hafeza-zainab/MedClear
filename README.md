@@ -61,10 +61,12 @@ MedClear accepts a photo and asks a vision-capable language model to extract onl
 | Variable | Required | Description |
 | --- | --- | --- |
 | `LLM_API_KEY` | Yes for live AI features | API credential read only by server routes. Never prefix it with `NEXT_PUBLIC_`. |
-| `LLM_MODEL` | Yes for live AI features | Vision-capable model name. It must accept image inputs and JSON response mode. |
+| `LLM_MODEL` | Yes for live AI features | Vision-capable model name. It must accept image inputs and follow JSON output instructions. |
 | `LLM_BASE_URL` | No | Provider API base URL. Defaults to `https://api.openai.com/v1`; use a provider that supports the OpenAI Chat Completions request/response format and image input. |
 
 The routes call `{LLM_BASE_URL}/chat/completions`. Image input uses the OpenAI-compatible `image_url` content format with a base64 data URL.
+
+To diagnose the analyze request locally, start `npm run dev` and in another terminal run `node scripts/test-analyze-route.mjs`. The script sends a synthetic one-pixel JPEG and prints only the sanitized upstream status and response body; the diagnostics response is enabled only in development.
 
 ## Narrated demo audio
 
