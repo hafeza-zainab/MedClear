@@ -323,7 +323,7 @@ export async function POST(request: Request) {
     }
 
     async function providerFailure(result: { response: Response; model: string }) {
-      const failure = await logUpstreamFailureDetails(`analyze model=${result.model}`, result.response, apiKey!);
+      const failure = await logUpstreamFailureDetails(`analyze model=${result.model}`, result.response);
       const headers = result.response.status === 429 && result.response.headers.has("retry-after")
         ? { "Retry-After": result.response.headers.get("retry-after")! }
         : undefined;
@@ -371,12 +371,7 @@ export async function POST(request: Request) {
     return NextResponse.json(analysis);
   } catch (error) {
     const errorName = error instanceof Error ? error.name : "UnknownError";
-    const errorMessage = error instanceof Error ? error.message : "Unknown request failure";
-    const safeErrorMessage = errorMessage
-      .replaceAll(apiKey, "[REDACTED API KEY]")
-      .replace(/data:image\/[a-z0-9.+-]+;base64,[a-z0-9+/=]+/gi, "[REDACTED IMAGE DATA]")
-      .slice(0, 500);
-    console.error("[MedClear] analyze request exception", { name: errorName, message: safeErrorMessage });
+    console.error("[MedClear] analyze request exception", { name: errorName });
     const timedOut = errorName === "TimeoutError" || errorName === "AbortError";
     return NextResponse.json(
       { error: timedOut

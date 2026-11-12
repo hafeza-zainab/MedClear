@@ -37,7 +37,7 @@ export default function SafetyCheck({ medicines, demoResult }: { medicines: Medi
   }, [medicines, demoResult]);
 
   return (
-    <section className="safety-section" aria-labelledby="safety-title" data-tour="safety-section">
+    <section id="step-safety" className="safety-section" aria-labelledby="safety-title" data-tour="safety-section">
       <div className="eyebrow"><span className="eyebrow-dot" /> Review with care</div>
       <h2 id="safety-title">Safety check</h2>
       {loading ? <p className="safety-state" role="status">Checking for common concerns…</p> : error ? (

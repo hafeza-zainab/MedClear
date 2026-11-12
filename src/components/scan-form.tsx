@@ -98,7 +98,8 @@ export default function ScanForm() {
       const resized = await resizeImage(file);
       const form = new FormData();
       form.append("image", resized, "medicine-photo.jpg");
-      form.append("language", language);
+      // Keep a canonical English result so a failed later translation always has a safe fallback.
+      form.append("language", "en");
       const response = await fetch("/api/analyze", { method: "POST", body: form });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || "Something went wrong. Please try again.");

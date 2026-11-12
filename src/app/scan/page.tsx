@@ -13,7 +13,7 @@ export default function ScanPage() {
         <span className="header-note">Medicine, made clearer</span>
       </header>
       <section className="scan-content" aria-labelledby="scan-title" data-tour="scan-section">
-        <StepIndicator active="Upload" />
+        <StepIndicator hasResult={false} />
         <Link className="back-link" href="/">← Home</Link>
         <div className="eyebrow"><span className="eyebrow-dot" /> Start with a photo</div>
         <h1 id="scan-title" className="scan-title">Let&apos;s make sense of it.</h1>

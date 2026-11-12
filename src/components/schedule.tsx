@@ -110,7 +110,7 @@ export default function Schedule({ analysis }: { analysis: Analysis }) {
   }
 
   return (
-    <section className="schedule-section" aria-labelledby="schedule-title" data-tour="schedule-section">
+    <section id="step-schedule" className="schedule-section" aria-labelledby="schedule-title" data-tour="schedule-section">
       <div className="schedule-heading-row">
         <div><div className="eyebrow"><span className="eyebrow-dot" /> Daily plan</div><h2 id="schedule-title">Your day at a glance</h2></div>
         <button className="print-button" type="button" onClick={() => window.print()}>Print / Save as PDF</button>

@@ -37,7 +37,7 @@ export async function POST(request: Request) {
       signal: AbortSignal.timeout(55_000),
     });
     if (!response.ok) {
-      const error = await logUpstreamFailure("check", response, apiKey);
+      const error = await logUpstreamFailure("check", response);
       return NextResponse.json({ error }, { status: response.status === 429 ? 429 : 502 });
     }
     const completion = await response.json();
@@ -57,7 +57,7 @@ export async function POST(request: Request) {
     }
     return NextResponse.json(parsed.data);
   } catch (error) {
-    console.error("Safety route error", error);
+    console.error("Safety route error", { name: error instanceof Error ? error.name : "UnknownError" });
     return NextResponse.json({ error: "Safety check could not be completed. Please ask a pharmacist." }, { status: 502 });
   }
 }

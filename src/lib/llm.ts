@@ -20,18 +20,13 @@ export function getChatCompletionsUrl() {
   return `${getLlmConfig().baseUrl}/chat/completions`;
 }
 
-export async function logUpstreamFailure(route: string, response: Response, apiKey: string) {
-  return (await logUpstreamFailureDetails(route, response, apiKey)).message;
+export async function logUpstreamFailure(route: string, response: Response) {
+  return (await logUpstreamFailureDetails(route, response)).message;
 }
 
-export async function logUpstreamFailureDetails(route: string, response: Response, apiKey: string) {
-  const rawBody = await response.text().catch(() => "<response body unavailable>");
-  const safeBody = rawBody
-    .replaceAll(apiKey, "[REDACTED API KEY]")
-    .replace(/data:image\/[a-z0-9.+-]+;base64,[a-z0-9+/=]+/gi, "[REDACTED IMAGE DATA]")
-    .slice(0, 3000);
-  console.error(`[MedClear] ${route} upstream failure: HTTP ${response.status}; response body: ${safeBody}`);
-  return { message: userFacingProviderError(response.status), status: response.status, body: safeBody };
+export async function logUpstreamFailureDetails(route: string, response: Response) {
+  console.error(`[MedClear] ${route} upstream failure: HTTP ${response.status}`);
+  return { message: userFacingProviderError(response.status), status: response.status };
 }
 
 export function userFacingProviderError(status: number) {

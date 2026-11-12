@@ -294,6 +294,31 @@ h1 {
   gap: 7px;
 }
 
+.step-link {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  gap: 7px;
+  padding: 0;
+  text-decoration: none;
+}
+
+.step-link:focus-visible {
+  border-radius: 4px;
+  outline: 3px solid #25877c;
+  outline-offset: 4px;
+}
+
+#step-review,
+#step-schedule,
+#step-safety {
+  scroll-margin-top: 24px;
+}
+
 .step-number {
   align-items: center;
   background: #eff3f1;
