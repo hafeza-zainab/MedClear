@@ -4,7 +4,7 @@ import { getChatCompletionsUrl, getLlmConfig, invalidModelJsonMessage, logUpstre
 import { getLanguage } from "@/lib/languages";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 75;
 
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
@@ -78,7 +78,7 @@ export async function POST(request: Request) {
           Authorization: `Bearer ${apiKey}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ model: requestedModel, messages }),
+        body: JSON.stringify({ model: requestedModel, reasoning_effort: "low", messages }),
         signal: AbortSignal.timeout(timeoutMs),
       });
     }
@@ -88,18 +88,18 @@ export async function POST(request: Request) {
     let responseModel = model;
     let response: Response;
     try {
-      response = await requestModel(model, 20_000);
+      response = await requestModel(model, 25_000);
     } catch (error) {
       const timedOut = error instanceof Error && error.name === "TimeoutError";
       if (!timedOut || fallbackModel === model) throw error;
       console.warn(`[MedClear] analyze model ${model} timed out; trying fallback model ${fallbackModel}`);
       responseModel = fallbackModel;
-      response = await requestModel(fallbackModel, 35_000);
+      response = await requestModel(fallbackModel, 45_000);
     }
     if (response.status === 503 && fallbackModel !== model && responseModel === model) {
       console.warn(`[MedClear] analyze model ${model} returned HTTP 503; trying fallback model ${fallbackModel}`);
       responseModel = fallbackModel;
-      response = await requestModel(fallbackModel, 35_000);
+      response = await requestModel(fallbackModel, 45_000);
     }
 
     if (!response.ok) {
