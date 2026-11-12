@@ -45,7 +45,7 @@ MedClear accepts a photo and asks a vision-capable language model to extract onl
 
    ```dotenv
    LLM_API_KEY=your_api_key
-   LLM_MODEL=gemini-2.5-flash
+   LLM_MODEL=gemini-3.8-flash
    LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
    ```
 
