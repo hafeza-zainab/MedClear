@@ -10,6 +10,12 @@ const scriptPath = path.join(root, "scripts", "generate_narration.py");
 const audioDir = path.join(root, "public", "audio");
 const scenes = JSON.parse(readFileSync(scenesPath, "utf8"));
 const generator = readFileSync(scriptPath, "utf8");
+const narrationSource = (process.env.NARRATION_SOURCE || "external").trim().toLowerCase();
+
+if (narrationSource === "external") {
+  console.log("External narration mode; skipping generated audio manifest check.");
+  process.exit(0);
+}
 
 function pythonConstant(name) {
   const match = generator.match(new RegExp(`^${name}\\s*=\\s*["']([^"']+)["']`, "m"));

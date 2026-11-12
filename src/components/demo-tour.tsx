@@ -7,6 +7,12 @@ import { getLanguage, LANGUAGES } from "@/lib/languages";
 
 const PACE = 1.25;
 const SCENE_GAP_MS = 700;
+const AUDIO_VERSION = "external-2026-11-12-1";
+const AUDIO_SOURCES = [
+  { extension: "mp3", type: "audio/mpeg" },
+  { extension: "m4a", type: "audio/mp4" },
+  { extension: "wav", type: "audio/wav" },
+] as const;
 const TOUR_KEY = "medclear-demo-tour-state";
 const MUTE_KEY = "medclear-demo-muted";
 const NO_AUDIO_FALLBACK_MS = [2200, 1700, 1200, 2000, 1500, 2200, 1700, 1700, 2200, 2000];
@@ -23,6 +29,25 @@ type TourState = {
   session: StorageSnapshot;
 };
 type NarrationPlayback = { started: Promise<boolean>; ended: Promise<boolean>; durationMs: () => number };
+
+function createSceneAudio(scene: Scene) {
+  const audio = new Audio();
+  audio.preload = "auto";
+  for (const source of AUDIO_SOURCES) {
+    const element = document.createElement("source");
+    element.src = `/audio/${scene.id}.${source.extension}?v=${AUDIO_VERSION}`;
+    element.type = source.type;
+    audio.append(element);
+  }
+  return audio;
+}
+
+function releaseAudioElement(audio: HTMLAudioElement) {
+  audio.pause();
+  audio.removeAttribute("src");
+  audio.querySelectorAll("source").forEach((source) => source.remove());
+  audio.load();
+}
 
 function todayKey() {
   const date = new Date();
@@ -105,19 +130,11 @@ export default function DemoTour() {
   const releaseAudio = useCallback(() => {
     const current = activeAudioRef.current;
     activeAudioRef.current = null;
-    if (current) {
-      current.pause();
-      current.removeAttribute("src");
-      current.load();
-    }
+    if (current) releaseAudioElement(current);
     activeAudioDoneRef.current?.();
     activeAudioDoneRef.current = null;
     const next = preloadedAudioRef.current?.audio;
-    if (next) {
-      next.pause();
-      next.removeAttribute("src");
-      next.load();
-    }
+    if (next) releaseAudioElement(next);
     preloadedAudioRef.current = null;
   }, []);
 
@@ -160,8 +177,7 @@ export default function DemoTour() {
   const preload = useCallback((scene: Scene | undefined) => {
     if (!scene) return;
     if (preloadedAudioRef.current?.id === scene.id) return;
-    const audio = new Audio(`/audio/${scene.id}.mp3`);
-    audio.preload = "auto";
+    const audio = createSceneAudio(scene);
     audio.load();
     preloadedAudioRef.current = { id: scene.id, audio };
   }, []);
@@ -170,7 +186,7 @@ export default function DemoTour() {
     if (mutedRef.current) return { started: Promise.resolve(false), ended: Promise.resolve(false), durationMs: () => 0 };
     const preloaded = preloadedAudioRef.current?.id === scene.id ? preloadedAudioRef.current.audio : null;
     preloadedAudioRef.current = null;
-    const audio = preloaded ?? new Audio(`/audio/${scene.id}.mp3`);
+    const audio = preloaded ?? createSceneAudio(scene);
     audio.preload = "auto";
     activeAudioRef.current = audio;
     let resolveStarted!: (started: boolean) => void;
@@ -197,9 +213,7 @@ export default function DemoTour() {
         audio.removeEventListener("error", onError);
         if (activeAudioRef.current === audio) activeAudioRef.current = null;
         if (activeAudioDoneRef.current === stopAudio) activeAudioDoneRef.current = null;
-        audio.pause();
-        audio.removeAttribute("src");
-        audio.load();
+        releaseAudioElement(audio);
         if (!hasStarted) resolveStarted(false);
         resolveEnded(finished && hasStarted);
       };

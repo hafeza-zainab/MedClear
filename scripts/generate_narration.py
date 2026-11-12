@@ -6,6 +6,7 @@ import argparse
 import asyncio
 import hashlib
 import json
+import os
 import re
 import subprocess
 from datetime import datetime, timezone
@@ -14,7 +15,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 # Change these defaults to configure generated narration. Use `edge-tts --list-voices` to browse.
-VOICE = "en-IN-NeerjaNeural"
+VOICE = "en-GB-SoniaNeural"
 RATE = "+0%"
 SILENCE_FILTER = "silenceremove=start_periods=1:start_duration=0.05:start_threshold=-50dB,areverse,silenceremove=start_periods=1:start_duration=0.05:start_threshold=-50dB,areverse,apad=pad_dur=0.15"
 
@@ -23,14 +24,20 @@ PRONUNCIATIONS = {
     "AI": "A I",
     "UI": "U I",
     "PDF": "P D F",
+    "pharmacist": "farmacist",
+    "interactions": "inter actions",
+    "schedule": "shed yool",
+    "paracetamol": "para see ta mol",
 }
 
-SAMPLE_VOICES = ("en-IN-NeerjaNeural", "en-IN-PrabhatNeural", "en-US-AriaNeural")
-SAMPLE_TEXT = "MedClear makes medicine information clearer. You can switch explanations to other languages."
+SAMPLE_VOICES = ("en-GB-SoniaNeural", "en-GB-RyanNeural", "en-GB-LibbyNeural")
+SAMPLE_TEXT = "MedClear explains paracetamol. Ask your pharmacist to review the schedule and possible interactions."
 NAME_VARIANTS = ("Med Clear", "Medd Clear", "Med, Clear", "Meddy Clear", "M E D Clear")
 ROOT = Path(__file__).resolve().parents[1]
+NARRATION_SOURCE = os.environ.get("NARRATION_SOURCE", "external").strip().lower() or "external"
 SCENES_FILE = ROOT / "src" / "data" / "demo-scenes.json"
 OUTPUT_DIR = ROOT / "public" / "audio"
+SAMPLE_OUTPUT_DIR = ROOT / "scripts" / "voice-samples"
 MANIFEST_FILE = OUTPUT_DIR / "manifest.json"
 
 
@@ -166,26 +173,24 @@ def load_edge_tts():
 
 async def generate_sample(edge_tts) -> None:
     check_internet()
-    sample_dir = OUTPUT_DIR / "voice-samples"
-    sample_dir.mkdir(parents=True, exist_ok=True)
+    SAMPLE_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     speech = prepare_speech(SAMPLE_TEXT)
     for voice in SAMPLE_VOICES:
-        output = sample_dir / f"{voice}.mp3"
+        output = SAMPLE_OUTPUT_DIR / f"{voice}.mp3"
         await generate_clip(edge_tts, speech, voice, output)
         print(f"Created {output.relative_to(ROOT)}")
 
 
-async def generate_name_tests(edge_tts) -> None:
+async def generate_name_tests(edge_tts, voice: str) -> None:
     check_internet()
-    sample_dir = OUTPUT_DIR / "voice-samples"
-    sample_dir.mkdir(parents=True, exist_ok=True)
+    SAMPLE_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     for index, variant in enumerate(NAME_VARIANTS, start=1):
-        output = sample_dir / f"name-{index:02d}.mp3"
-        await generate_clip(edge_tts, variant, VOICE, output)
+        output = SAMPLE_OUTPUT_DIR / f"name-{index:02d}.mp3"
+        await generate_clip(edge_tts, variant, voice, output)
         print(f"{variant}: {output.resolve()}")
 
 
-async def generate_scenes(edge_tts, force: bool) -> None:
+async def generate_scenes(edge_tts, force: bool, voice: str, overwrite_external: bool) -> None:
     scenes = load_scenes()
     previous = load_manifest().get("scenes", {})
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -195,33 +200,39 @@ async def generate_scenes(edge_tts, force: bool) -> None:
     for scene in scenes:
         scene_id = scene["id"]
         output = OUTPUT_DIR / f"{scene_id}.mp3"
-        current_hash = speech_hash(scene["speech"], VOICE, RATE)
         old = previous.get(scene_id, {})
-        stale = old.get("hash") != current_hash or old.get("voice") != VOICE or old.get("rate") != RATE
-        if force or stale or not output.is_file():
+        if NARRATION_SOURCE == "external" and output.is_file() and not overwrite_external:
+            print(f"Refusing to overwrite externally managed {output.name}; pass --overwrite-external to replace it.")
+            if old:
+                records[scene_id] = old
+            continue
+        current_hash = speech_hash(scene["speech"], voice, RATE)
+        stale = old.get("hash") != current_hash or old.get("voice") != voice or old.get("rate") != RATE
+        if force or overwrite_external or stale or not output.is_file():
             pending.append(scene)
         else:
             print(f"Keeping current {output.name}.")
-        records[scene_id] = {"hash": current_hash, "voice": VOICE, "rate": RATE}
+        records[scene_id] = {"hash": current_hash, "voice": voice, "rate": RATE}
 
     if pending:
         check_internet()
     for scene in pending:
         output = OUTPUT_DIR / f"{scene['id']}.mp3"
-        await generate_clip(edge_tts, prepare_speech(scene["speech"]), VOICE, output)
+        await generate_clip(edge_tts, prepare_speech(scene["speech"]), voice, output)
         print(f"Created {output.relative_to(ROOT)}")
 
-    manifest = {
-        "updated_at": datetime.now(timezone.utc).isoformat(),
-        "hash_format": "sha256(speech + NUL + voice + NUL + rate)",
-        "pronunciation_hash": pronunciation_hash(),
-        "silence_filter_hash": hashlib.sha256(SILENCE_FILTER.encode("utf-8")).hexdigest(),
-        "scenes": records,
-    }
-    temp_file = MANIFEST_FILE.with_suffix(".json.tmp")
-    temp_file.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    temp_file.replace(MANIFEST_FILE)
-    print(f"Updated {MANIFEST_FILE.relative_to(ROOT)}")
+    if NARRATION_SOURCE != "external":
+        manifest = {
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "hash_format": "sha256(speech + NUL + voice + NUL + rate)",
+            "pronunciation_hash": pronunciation_hash(),
+            "silence_filter_hash": hashlib.sha256(SILENCE_FILTER.encode("utf-8")).hexdigest(),
+            "scenes": records,
+        }
+        temp_file = MANIFEST_FILE.with_suffix(".json.tmp")
+        temp_file.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        temp_file.replace(MANIFEST_FILE)
+        print(f"Updated {MANIFEST_FILE.relative_to(ROOT)}")
 
 
 def main() -> None:
@@ -229,16 +240,18 @@ def main() -> None:
     parser.add_argument("--force", action="store_true", help="Regenerate every scene MP3.")
     parser.add_argument("--sample", action="store_true", help="Generate one short clip in three comparison voices.")
     parser.add_argument("--test-name", action="store_true", help="Generate name-pronunciation comparison clips in the current voice.")
+    parser.add_argument("--voice", default=VOICE, help=f"Voice for scene generation and --test-name (default: {VOICE}).")
+    parser.add_argument("--overwrite-external", action="store_true", help="Allow replacing existing scene MP3s while NARRATION_SOURCE=external.")
     args = parser.parse_args()
     edge_tts = load_edge_tts()
     if args.sample and args.test_name:
         parser.error("Use either --sample or --test-name, not both.")
     if args.test_name:
-        asyncio.run(generate_name_tests(edge_tts))
+        asyncio.run(generate_name_tests(edge_tts, args.voice))
     elif args.sample:
         asyncio.run(generate_sample(edge_tts))
     else:
-        asyncio.run(generate_scenes(edge_tts, args.force))
+        asyncio.run(generate_scenes(edge_tts, args.force, args.voice, args.overwrite_external))
 
 
 if __name__ == "__main__":

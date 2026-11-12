@@ -79,7 +79,7 @@ To diagnose the analyze request locally, start `npm run dev` and in another term
 
 ## Narrated demo audio
 
-The demo captions and narration script share `src/data/demo-scenes.json`. Narration is English only; the language scene shows localized on-screen text without speaking it. Generated files live in `public/audio/` and are committed with the app so running MedClear and watching the demo needs neither Python nor an internet connection.
+The demo captions and narration script share `src/data/demo-scenes.json`. Narration is English only; the language scene shows localized on-screen text without speaking it. The default `NARRATION_SOURCE=external` mode uses the audio files in `public/audio/` and skips generated-audio manifest checks during builds. For each scene, the tour tries `scene_01.mp3` through `scene_10.mp3`, then the matching `.m4a`, then `.wav`. Keep the two-digit scene names so they match the scene IDs. Audio URLs include a version query to bust browser and CDN caches. The supplied external scene audio is committed with the app, so watching the demo needs neither Python nor an internet connection.
 
 To generate or update the narration MP3s, use Python and install the development-only dependency:
 
@@ -88,7 +88,15 @@ pip install -r requirements-dev.txt
 python scripts/generate_narration.py
 ```
 
-Generation requires Python, an internet connection, `edge-tts`, and `imageio-ffmpeg`. The generator trims leading and trailing silence while retaining about 150 ms at the end of each clip. It compares each scene's speech and voice hash with `public/audio/manifest.json`, regenerating missing or stale files; use `python scripts/generate_narration.py --force` to regenerate all scenes. The build logs a prominent warning when the manifest is stale. The default voice is `en-IN-NeerjaNeural` at its normal `+0%` rate; edit `VOICE` and `RATE` at the top of the script. Use `edge-tts --list-voices` to browse available voices. Run `python scripts/generate_narration.py --sample` to create comparison clips for three voices, or `python scripts/generate_narration.py --test-name` to compare app-name pronunciations in `public/audio/voice-samples/`.
+Generation requires Python, an internet connection, `edge-tts`, and `imageio-ffmpeg`. The generator trims leading and trailing silence while retaining about 150 ms at the end of each clip. In external mode, it refuses to overwrite an existing scene MP3 unless `--overwrite-external` is passed; it does not write a freshness manifest. To use generated narration and manifest checks instead, set `NARRATION_SOURCE=internal`. The default generated voice is `en-GB-SoniaNeural` at its normal `+0%` rate. Use `edge-tts --list-voices` to browse available voices. Run `python scripts/generate_narration.py --sample` to create the same short test sentence in en-GB-SoniaNeural, en-GB-RyanNeural, and en-GB-LibbyNeural, saved under the ignored `scripts/voice-samples/` folder. Run `python scripts/generate_narration.py --test-name` to compare the five app-name spellings in the default voice; add `--voice en-GB-RyanNeural` to choose a different voice.
+
+Check scene files, durations, and caption word counts with:
+
+```bash
+npm run verify:audio
+```
+
+The verifier checks that each scene has an MP3, M4A, or WAV file and warns when its duration is under three seconds or over twenty five seconds. If no supported file loads in the browser, the tour silently uses its timed captions.
 
 ## Limitations
 

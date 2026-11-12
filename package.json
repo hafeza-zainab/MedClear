@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "node scripts/check-narration-manifest.mjs && next build",
     "start": "next start",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "verify:audio": "node scripts/verify-audio.mjs"
   },
   "dependencies": {
     "next": "15.5.6",
