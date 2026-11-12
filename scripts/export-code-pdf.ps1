@@ -16,8 +16,9 @@ $files = Get-ChildItem -LiteralPath $projectRoot -Recurse -File | Where-Object {
 
 $builder = [Text.StringBuilder]::new()
 [void]$builder.AppendLine("<!doctype html><html lang='en'><head><meta charset='utf-8'><title>MedClear source code</title>")
-[void]$builder.AppendLine("<style>body{font:14px Arial,sans-serif;color:#183a3b;margin:32px}h1{font-size:26px}h2{font-size:16px;background:#edf5f1;padding:10px;page-break-after:avoid;overflow-wrap:anywhere}pre{font:10px/1.4 Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere;border:1px solid #dce8e2;padding:12px;page-break-inside:auto}section{page-break-before:auto} @media print{body{margin:14mm}h2{page-break-after:avoid}pre{font-size:8pt}}</style></head><body>")
+[void]$builder.AppendLine("<style>body{font:14px Arial,sans-serif;color:#183a3b;margin:32px}h1{font-size:26px}h2{font-size:16px;background:#edf5f1;padding:10px;page-break-after:avoid;overflow-wrap:anywhere}pre{font:10px/1.4 Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere;border:1px solid #dce8e2;padding:12px;page-break-inside:auto}section{page-break-before:auto}.judge-note{background:#eef8f6;border-left:5px solid #25877c;padding:14px 18px;margin:20px 0;font-size:15px;line-height:1.5} @media print{body{margin:14mm}h2{page-break-after:avoid}pre{font-size:8pt}}</style></head><body>")
 [void]$builder.AppendLine("<h1>MedClear — Source Code Submission</h1><p>Generated $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')</p>")
+[void]$builder.AppendLine("<aside class='judge-note'><strong>Live scan availability</strong><br>Live scans use Google’s free Gemini API and can occasionally be slow, rate-limited or unavailable. If that happens, use ▶ Watch demo or Open sample results to see the complete flow.</aside>")
 
 foreach ($file in $files) {
   $relative = [IO.Path]::GetRelativePath($projectRoot, $file.FullName).Replace("\", "/")

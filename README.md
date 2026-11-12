@@ -4,6 +4,10 @@ MedClear is a hackathon project for the **AI x Healthcare** theme. It helps peop
 
 > **MedClear is for information only. Always confirm with your doctor or pharmacist.** It does not diagnose, prescribe, or replace professional medical advice.
 
+## Live scan availability
+
+> Live scans use Google’s free Gemini API and can occasionally be slow, rate-limited or unavailable. If that happens, use ▶ Watch demo or Open sample results to see the complete flow.
+
 ## Problem
 
 Prescription instructions and medicine packaging can be difficult to read or understand, especially when a person is managing several medicines or needs an explanation in a familiar language.
