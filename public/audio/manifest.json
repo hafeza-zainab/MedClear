@@ -1,7 +1,7 @@
 {
-  "updated_at": "2026-11-12T03:18:11.585407+00:00",
+  "updated_at": "2026-11-12T03:34:12.123543+00:00",
   "hash_format": "sha256(speech + NUL + voice + NUL + rate)",
-  "pronunciation_hash": "3a6c5836e9f8da7711efef22cbd593632f48749d031f57074cc198a6d34175a9",
+  "pronunciation_hash": "1419e8c1a0875eb8d543b0940ef29e0ce0f77a827a907706fc80f699e9ffbdcc",
   "silence_filter_hash": "66e9985e2d4f6fe83dd76f5b4ded1c722edba76fa080b8e24f6c11c92f09e962",
   "scenes": {
     "scene_01": {

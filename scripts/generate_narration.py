@@ -19,7 +19,7 @@ RATE = "+8%"
 SILENCE_FILTER = "silenceremove=start_periods=1:start_duration=0.05:start_threshold=-50dB,areverse,silenceremove=start_periods=1:start_duration=0.05:start_threshold=-50dB,areverse"
 
 PRONUNCIATIONS = {
-    "MedClear": "Med Clear",
+    "MedClear": "Medd Clear",
     "AI": "A I",
     "UI": "U I",
     "PDF": "P D F",
