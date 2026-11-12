@@ -71,33 +71,35 @@ export async function POST(request: Request) {
           },
         ];
 
-    async function requestModel(requestedModel: string, retryTransient: boolean) {
-      let modelResponse: Response;
-      for (let attempt = 0; ; attempt += 1) {
-        modelResponse = await fetch(getChatCompletionsUrl(), {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ model: requestedModel, messages }),
-          signal: AbortSignal.timeout(24_000),
-        });
-        const shouldRetry = retryTransient && [500, 502].includes(modelResponse.status) && attempt === 0;
-        if (!shouldRetry) return modelResponse;
-        await modelResponse.arrayBuffer();
-        await new Promise((resolve) => setTimeout(resolve, 500));
-      }
+    function requestModel(requestedModel: string, timeoutMs: number) {
+      return fetch(getChatCompletionsUrl(), {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ model: requestedModel, messages }),
+        signal: AbortSignal.timeout(timeoutMs),
+      });
     }
 
-    // 503 explicitly means the selected model is unavailable, so switch to a
-    // second vision-capable Gemini model instead of repeatedly querying it.
+    // Reserve time for the fallback instead of spending the whole route budget
+    // repeating a model that Gemini has already marked unavailable.
     let responseModel = model;
-    let response = await requestModel(model, true);
-    if (response.status === 503 && fallbackModel !== model) {
-      console.warn(`[MedClear] analyze model ${model} returned HTTP 503; retrying with fallback model ${fallbackModel}`);
+    let response: Response;
+    try {
+      response = await requestModel(model, 20_000);
+    } catch (error) {
+      const timedOut = error instanceof Error && error.name === "TimeoutError";
+      if (!timedOut || fallbackModel === model) throw error;
+      console.warn(`[MedClear] analyze model ${model} timed out; trying fallback model ${fallbackModel}`);
       responseModel = fallbackModel;
-      response = await requestModel(fallbackModel, false);
+      response = await requestModel(fallbackModel, 35_000);
+    }
+    if (response.status === 503 && fallbackModel !== model && responseModel === model) {
+      console.warn(`[MedClear] analyze model ${model} returned HTTP 503; trying fallback model ${fallbackModel}`);
+      responseModel = fallbackModel;
+      response = await requestModel(fallbackModel, 35_000);
     }
 
     if (!response.ok) {
@@ -112,9 +114,20 @@ export async function POST(request: Request) {
       );
     }
 
-    const completion = await response.json();
-    const content = completion?.choices?.[0]?.message?.content;
-    if (typeof content !== "string") throw new Error("Model response did not contain JSON text");
+    let completion: unknown;
+    try {
+      completion = await response.json();
+    } catch {
+      console.error("[MedClear] analyze provider returned a non-JSON response", { model: responseModel });
+      return NextResponse.json({ error: invalidModelJsonMessage() }, { status: 502 });
+    }
+    const content = (completion as {
+      choices?: Array<{ message?: { content?: unknown } }>;
+    })?.choices?.[0]?.message?.content;
+    if (typeof content !== "string") {
+      console.error("[MedClear] analyze provider response had no text content", { model: responseModel });
+      return NextResponse.json({ error: invalidModelJsonMessage() }, { status: 502 });
+    }
     let parsed: unknown;
     try {
       parsed = JSON.parse(content);
@@ -133,10 +146,19 @@ export async function POST(request: Request) {
 
     return NextResponse.json(validated.data);
   } catch (error) {
-    console.error("Analysis route error", error);
+    const errorName = error instanceof Error ? error.name : "UnknownError";
+    const errorMessage = error instanceof Error ? error.message : "Unknown request failure";
+    const safeErrorMessage = errorMessage
+      .replaceAll(apiKey, "[REDACTED API KEY]")
+      .replace(/data:image\/[a-z0-9.+-]+;base64,[a-z0-9+/=]+/gi, "[REDACTED IMAGE DATA]")
+      .slice(0, 500);
+    console.error("[MedClear] analyze request exception", { name: errorName, message: safeErrorMessage });
+    const timedOut = errorName === "TimeoutError" || errorName === "AbortError";
     return NextResponse.json(
-      { error: "We couldn't analyze that image. Please try again with a clearer photo." },
-      { status: 502 },
+      { error: timedOut
+        ? "The AI service took too long to read this photo. Please try again shortly or use the sample."
+        : "We couldn't complete the AI request. Please try again or use the sample." },
+      { status: timedOut ? 504 : 502 },
     );
   }
 }
