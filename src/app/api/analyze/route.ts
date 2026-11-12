@@ -54,13 +54,7 @@ export async function POST(request: Request) {
   const imageData = `data:${image.type};base64,${bytes.toString("base64")}`;
 
   try {
-    const response = await fetch(getChatCompletionsUrl(), {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
+    const requestBody = JSON.stringify({
         model,
         messages: [
           {
@@ -76,9 +70,25 @@ export async function POST(request: Request) {
             ],
           },
         ],
-      }),
-      signal: AbortSignal.timeout(55_000),
-    });
+      });
+
+    // Gemini can return a transient 5xx while its vision backend is busy.
+    // Retry those responses once; do not retry client/configuration errors.
+    let response: Response;
+    for (let attempt = 0; ; attempt += 1) {
+      response = await fetch(getChatCompletionsUrl(), {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: requestBody,
+        signal: AbortSignal.timeout(55_000),
+      });
+      if (![500, 502, 503].includes(response.status) || attempt === 1) break;
+      await response.arrayBuffer();
+      await new Promise((resolve) => setTimeout(resolve, 700));
+    }
 
     if (!response.ok) {
       const failure = await logUpstreamFailureDetails("analyze", response, apiKey);
