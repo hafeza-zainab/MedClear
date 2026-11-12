@@ -45,7 +45,8 @@ MedClear accepts a photo and asks a vision-capable language model to extract onl
 
    ```dotenv
    LLM_API_KEY=your_api_key
-   LLM_MODEL=your_vision_model_name
+   LLM_MODEL=gemini-2.5-flash
+   LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
    ```
 
 4. Start the development server:
@@ -61,10 +62,10 @@ MedClear accepts a photo and asks a vision-capable language model to extract onl
 | Variable | Required | Description |
 | --- | --- | --- |
 | `LLM_API_KEY` | Yes for live AI features | API credential read only by server routes. Never prefix it with `NEXT_PUBLIC_`. |
-| `LLM_MODEL` | Yes for live AI features | Vision-capable model name. It must accept image inputs and follow JSON output instructions. |
-| `LLM_BASE_URL` | No | Provider API base URL. Defaults to `https://api.openai.com/v1`; use a provider that supports the OpenAI Chat Completions request/response format and image input. |
+| `LLM_MODEL` | Yes | Vision-capable model name. It must accept image inputs and follow JSON output instructions. |
+| `LLM_BASE_URL` | Yes | Provider API base URL. For Gemini's OpenAI-compatible API, use `https://generativelanguage.googleapis.com/v1beta/openai`. |
 
-The routes call `{LLM_BASE_URL}/chat/completions`. Image input uses the OpenAI-compatible `image_url` content format with a base64 data URL.
+The routes call `{LLM_BASE_URL}/chat/completions`. Image input uses the OpenAI-compatible `image_url` content format with a base64 data URL. `LLM_BASE_URL` and `LLM_MODEL` are required; the server fails at startup with a clear error if either is missing.
 
 To diagnose the analyze request locally, start `npm run dev` and in another terminal run `node scripts/test-analyze-route.mjs`. The script sends a synthetic one-pixel JPEG and prints only the sanitized upstream status and response body; the diagnostics response is enabled only in development.
 

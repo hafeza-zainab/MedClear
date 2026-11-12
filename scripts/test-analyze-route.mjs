@@ -1,5 +1,19 @@
 // Start `npm run dev`, then run `node scripts/test-analyze-route.mjs`.
 // This submits only a synthetic one-pixel JPEG, never a prescription photo.
+import { createRequire } from "node:module";
+
+const require = createRequire(import.meta.url);
+require("@next/env").loadEnvConfig(process.cwd(), true);
+const model = process.env.LLM_MODEL?.trim();
+const baseUrl = process.env.LLM_BASE_URL?.trim().replace(/\/+$/, "");
+const missing = [!baseUrl && "LLM_BASE_URL", !model && "LLM_MODEL"].filter(Boolean);
+if (missing.length) {
+  console.error(`Missing required environment variable${missing.length > 1 ? "s" : ""}: ${missing.join(", ")}. Check .env.local and restart the development server.`);
+  process.exit(1);
+}
+console.log(`Effective model: ${model}`);
+console.log(`Effective base URL: ${baseUrl}`);
+
 const endpoint = process.env.MEDCLEAR_TEST_URL ?? "http://127.0.0.1:3000/api/analyze";
 const jpegBase64 = "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////2wBDAf//////////////////////////////////////////////////////////////////////////////////////wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAX/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIQAxAAAAH/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oACAEBAAEFAqf/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oACAEDAQE/AX//xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oACAECAQE/AX//xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oACAEBAAY/Al//xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oACAEBAAE/IT//xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oACAECAQE/EB//xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oACAEDAQE/EB//2Q==";
 

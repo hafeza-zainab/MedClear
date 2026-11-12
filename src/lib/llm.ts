@@ -1,9 +1,18 @@
-const DEFAULT_LLM_BASE_URL = "https://api.openai.com/v1";
-
 export function getLlmConfig() {
+  const model = process.env.LLM_MODEL?.trim();
+  const baseUrl = process.env.LLM_BASE_URL?.trim().replace(/\/+$/, "");
+  const missing = [
+    !baseUrl && "LLM_BASE_URL",
+    !model && "LLM_MODEL",
+  ].filter(Boolean);
+
+  if (missing.length) {
+    throw new Error(`Missing required environment variable${missing.length > 1 ? "s" : ""}: ${missing.join(", ")}. Set them in .env.local or the deployment environment, then restart the server.`);
+  }
+
   return {
-    model: process.env.LLM_MODEL?.trim() || "",
-    baseUrl: (process.env.LLM_BASE_URL?.trim() || DEFAULT_LLM_BASE_URL).replace(/\/+$/, ""),
+    model: model!,
+    baseUrl: baseUrl!,
   };
 }
 
