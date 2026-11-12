@@ -8,6 +8,7 @@ export const maxDuration = 60;
 
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+const DEFAULT_FALLBACK_MODEL = "gemini-3.7-flash";
 
 function matchesImageType(type: string, bytes: Buffer) {
   if (type === "image/jpeg") return bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
@@ -19,6 +20,7 @@ function matchesImageType(type: string, bytes: Buffer) {
 export async function POST(request: Request) {
   const apiKey = process.env.LLM_API_KEY;
   const { model } = getLlmConfig();
+  const fallbackModel = process.env.LLM_FALLBACK_MODEL?.trim() || DEFAULT_FALLBACK_MODEL;
 
   if (!apiKey || !model) {
     return NextResponse.json(
@@ -54,9 +56,7 @@ export async function POST(request: Request) {
   const imageData = `data:${image.type};base64,${bytes.toString("base64")}`;
 
   try {
-    const requestBody = JSON.stringify({
-        model,
-        messages: [
+    const messages = [
           {
             role: "system",
             content:
@@ -69,29 +69,39 @@ export async function POST(request: Request) {
               { type: "image_url", image_url: { url: imageData } },
             ],
           },
-        ],
-      });
+        ];
 
-    // Gemini can return a transient 5xx while its vision backend is busy.
-    // Retry those responses once; do not retry client/configuration errors.
-    let response: Response;
-    for (let attempt = 0; ; attempt += 1) {
-      response = await fetch(getChatCompletionsUrl(), {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: requestBody,
-        signal: AbortSignal.timeout(55_000),
-      });
-      if (![500, 502, 503].includes(response.status) || attempt === 1) break;
-      await response.arrayBuffer();
-      await new Promise((resolve) => setTimeout(resolve, 700));
+    async function requestModel(requestedModel: string, retryTransient: boolean) {
+      let modelResponse: Response;
+      for (let attempt = 0; ; attempt += 1) {
+        modelResponse = await fetch(getChatCompletionsUrl(), {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ model: requestedModel, messages }),
+          signal: AbortSignal.timeout(24_000),
+        });
+        const shouldRetry = retryTransient && [500, 502].includes(modelResponse.status) && attempt === 0;
+        if (!shouldRetry) return modelResponse;
+        await modelResponse.arrayBuffer();
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      }
+    }
+
+    // 503 explicitly means the selected model is unavailable, so switch to a
+    // second vision-capable Gemini model instead of repeatedly querying it.
+    let responseModel = model;
+    let response = await requestModel(model, true);
+    if (response.status === 503 && fallbackModel !== model) {
+      console.warn(`[MedClear] analyze model ${model} returned HTTP 503; retrying with fallback model ${fallbackModel}`);
+      responseModel = fallbackModel;
+      response = await requestModel(fallbackModel, false);
     }
 
     if (!response.ok) {
-      const failure = await logUpstreamFailureDetails("analyze", response, apiKey);
+      const failure = await logUpstreamFailureDetails(`analyze model=${responseModel}`, response, apiKey);
       const diagnostics = process.env.NODE_ENV === "development"
         && request.headers.get("x-medclear-test-diagnostics") === "true"
         ? { upstreamStatus: failure.status, upstreamBody: failure.body }
@@ -109,7 +119,7 @@ export async function POST(request: Request) {
     try {
       parsed = JSON.parse(content);
     } catch {
-      console.error("[MedClear] analyze model returned invalid JSON", { model });
+      console.error("[MedClear] analyze model returned invalid JSON", { model: responseModel });
       return NextResponse.json({ error: invalidModelJsonMessage() }, { status: 502 });
     }
     const validated = analysisSchema.safeParse(parsed);
