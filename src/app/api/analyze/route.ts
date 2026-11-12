@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { analysisSchema } from "@/lib/medical";
-import { getChatCompletionsUrl } from "@/lib/llm";
+import { getChatCompletionsUrl, getLlmConfig, invalidModelJsonMessage, logUpstreamFailure } from "@/lib/llm";
+import { getLanguage } from "@/lib/languages";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -17,11 +18,11 @@ function matchesImageType(type: string, bytes: Buffer) {
 
 export async function POST(request: Request) {
   const apiKey = process.env.LLM_API_KEY;
-  const model = process.env.LLM_MODEL;
+  const { model } = getLlmConfig();
 
   if (!apiKey || !model) {
     return NextResponse.json(
-      { error: "Analysis is not configured yet. Please try the sample result." },
+      { error: "The AI service isn't configured. Please try the sample." },
       { status: 503 },
     );
   }
@@ -35,7 +36,7 @@ export async function POST(request: Request) {
 
   const image = formData.get("image");
   const language = formData.get("language");
-  const languageName = language === "hi" ? "Hindi" : language === "mr" ? "Marathi" : "English";
+  const languageName = getLanguage(language).promptName;
   if (!(image instanceof File)) {
     return NextResponse.json({ error: "Choose a prescription or medicine photo first." }, { status: 400 });
   }
@@ -61,7 +62,6 @@ export async function POST(request: Request) {
       },
       body: JSON.stringify({
         model,
-        response_format: { type: "json_object" },
         messages: [
           {
             role: "system",
@@ -81,23 +81,28 @@ export async function POST(request: Request) {
     });
 
     if (!response.ok) {
-      const errorBody = await response.json().catch(() => null);
-      console.error("LLM analysis request failed", response.status, errorBody?.error?.message);
+      const error = await logUpstreamFailure("analyze", response, apiKey);
       return NextResponse.json(
-        { error: "We couldn't read this image right now. Please try again or use the sample." },
-        { status: response.status === 429 ? 503 : 502 },
+        { error },
+        { status: response.status === 429 ? 429 : 502 },
       );
     }
 
     const completion = await response.json();
     const content = completion?.choices?.[0]?.message?.content;
     if (typeof content !== "string") throw new Error("Model response did not contain JSON text");
-    const parsed = JSON.parse(content);
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(content);
+    } catch {
+      console.error("[MedClear] analyze model returned invalid JSON", { model });
+      return NextResponse.json({ error: invalidModelJsonMessage() }, { status: 502 });
+    }
     const validated = analysisSchema.safeParse(parsed);
     if (!validated.success) {
       console.error("LLM returned invalid analysis JSON", validated.error.flatten());
       return NextResponse.json(
-        { error: "The result was incomplete. Please retake the photo or try the sample." },
+        { error: invalidModelJsonMessage() },
         { status: 502 },
       );
     }

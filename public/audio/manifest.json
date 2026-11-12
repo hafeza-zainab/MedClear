@@ -1,56 +1,58 @@
 {
-  "updated_at": "2026-11-07T12:19:27.173062+00:00",
+  "updated_at": "2026-11-12T03:18:11.585407+00:00",
   "hash_format": "sha256(speech + NUL + voice + NUL + rate)",
+  "pronunciation_hash": "3a6c5836e9f8da7711efef22cbd593632f48749d031f57074cc198a6d34175a9",
+  "silence_filter_hash": "66e9985e2d4f6fe83dd76f5b4ded1c722edba76fa080b8e24f6c11c92f09e962",
   "scenes": {
     "scene_01": {
-      "hash": "6acce5e8023f9ea233c324cdb7eea8cf19b065651413482321f209f035c80c6e",
+      "hash": "d190714f1bed5a93356ddabbc73c71df43d606f4a89ef5db17e104dfe3b3c3a6",
       "voice": "en-IN-NeerjaNeural",
-      "rate": "+0%"
+      "rate": "+8%"
     },
     "scene_02": {
-      "hash": "24872c50bb1e5b4992335e091779c0d434b41dc7d4076220a1d9645ad0c37c12",
+      "hash": "ca9398b7685db38bf3fe444954e109e34ba03e7a32ddb9e6362ec321cf832c8f",
       "voice": "en-IN-NeerjaNeural",
-      "rate": "+0%"
+      "rate": "+8%"
     },
     "scene_03": {
-      "hash": "b4cdc1cda78a9a731fbee56d682667f9dfd84f54ffe15597c2a3a638bc1a7f89",
+      "hash": "6f7383b855525391bdafd986b37d0e8a7bc48e786c68a0afcc0772a55c08c77f",
       "voice": "en-IN-NeerjaNeural",
-      "rate": "+0%"
+      "rate": "+8%"
     },
     "scene_04": {
-      "hash": "eb13846e2608f219e9593480f21b1d3333a8f69b2dc253f6a3b2e9795f7317bd",
+      "hash": "646245499a8298333d966cb2eefd931ac3c7dc38a91fae42ae60de0f609512db",
       "voice": "en-IN-NeerjaNeural",
-      "rate": "+0%"
+      "rate": "+8%"
     },
     "scene_05": {
-      "hash": "24610e33b956c59cea06e826c6a8ee7dd1ad206ab08f39b21bbfc306b217e060",
+      "hash": "8fc04cd3aceefc190f9734c18eb6e34a3725f959585fed2a7e0ad6c6709c93ea",
       "voice": "en-IN-NeerjaNeural",
-      "rate": "+0%"
+      "rate": "+8%"
     },
     "scene_06": {
-      "hash": "e4b6876b65bc627df90ad8c34f2da9e440d770b7ba1455f3faafa1b995385859",
+      "hash": "a087fc7c4eebbb2d00575daff6e11aa39c194394d989a036964cda8c53341b11",
       "voice": "en-IN-NeerjaNeural",
-      "rate": "+0%"
+      "rate": "+8%"
     },
     "scene_07": {
-      "hash": "e8c2da35dbb62a8dc46bc30b5253dbc9119cb5708741d03448b7ae62ce46a76e",
+      "hash": "267b1f9e999b36dc3632659664d98cefe32ca96158ff5a9edd4fda74475dfd2c",
       "voice": "en-IN-NeerjaNeural",
-      "rate": "+0%"
+      "rate": "+8%"
     },
     "scene_08": {
-      "hash": "61f4488c1da47f1622903d4fde6d02330995fe9f68b684ee10186797bdb53bfb",
+      "hash": "011e67e2e9a98fc4a670d4431a880cfeadc445d73cba85f1cf81ce651e5c7e97",
       "voice": "en-IN-NeerjaNeural",
-      "rate": "+0%"
+      "rate": "+8%"
     },
     "scene_09": {
-      "hash": "4065f1982af4f440e88f143ebeb87585d761417f951dce1c1e68669a3b07ea3c",
+      "hash": "61c383923c07473551f0c71ddf25268c6add921711bab8b165d448071613874e",
       "voice": "en-IN-NeerjaNeural",
-      "rate": "+0%"
+      "rate": "+8%"
     },
     "scene_10": {
-      "hash": "b90f6b856dc837652324850719c81f6f39f01d0f1e9ddaac2f6d6be63e6a2a47",
+      "hash": "15b55f561eed92968453e12690d243fc4165ad251bd519fb33af9e7f44c2c019",
       "voice": "en-IN-NeerjaNeural",
-      "rate": "+0%"
+      "rate": "+8%"
     }
   }
 }

@@ -1,18 +1,18 @@
 [
   {
     "id": "scene_01",
-    "caption": "Medicine instructions can be confusing, especially when a label is hard to read. MedClear shares information only, and you should confirm it with your doctor or pharmacist.",
-    "speech": "Medicine instructions can be confusing, especially when a label is hard to read. MedClear shares information only, and you should confirm it with your doctor or pharmacist."
+    "caption": "Medicine instructions can be confusing, especially when a label is hard to read, and MedClear shares information only, so confirm it with your doctor or pharmacist.",
+    "speech": "Medicine instructions can be confusing, especially when a label is hard to read, and MedClear shares information only, so confirm it with your doctor or pharmacist."
   },
   {
     "id": "scene_02",
-    "caption": "On the scan page, choose a photo or take one with your camera. The preview lets you check the image before continuing.",
-    "speech": "On the scan page, choose a photo or take one with your camera. The preview lets you check the image before continuing."
+    "caption": "On the scan page, choose a photo or take one with your camera, then check the image in the preview before continuing.",
+    "speech": "On the scan page, choose a photo or take one with your camera, then check the image in the preview before continuing."
   },
   {
     "id": "scene_03",
-    "caption": "This walkthrough uses a built in sample prescription. It stays in the app and makes no network request.",
-    "speech": "This walkthrough uses a built in sample prescription. It stays in the app and makes no network request."
+    "caption": "This walkthrough uses a built in sample prescription that stays in the app and makes no network request.",
+    "speech": "This walkthrough uses a built in sample prescription that stays in the app and makes no network request."
   },
   {
     "id": "scene_04",
@@ -21,32 +21,32 @@
   },
   {
     "id": "scene_05",
-    "caption": "Some details are unclear. MedClear points them out instead of guessing, so you can check the package or ask a pharmacist.",
-    "speech": "Some details are unclear. MedClear points them out instead of guessing, so you can check the package or ask a pharmacist."
+    "caption": "Some details are unclear, and MedClear points them out instead of guessing so you can check the package or ask a pharmacist.",
+    "speech": "Some details are unclear, and MedClear points them out instead of guessing so you can check the package or ask a pharmacist."
   },
   {
     "id": "scene_06",
-    "caption": "The schedule groups doses by morning, afternoon, evening, and night. We will mark two example doses as taken, and the checkmarks stay in this browser.",
-    "speech": "The schedule groups doses by morning, afternoon, evening, and night. We will mark two example doses as taken, and the checkmarks stay in this browser."
+    "caption": "The schedule groups doses by morning, afternoon, evening, and night, and we will mark two example doses as taken so you can see the checkmarks in this browser.",
+    "speech": "The schedule groups doses by morning, afternoon, evening, and night, and we will mark two example doses as taken so you can see the checkmarks in this browser."
   },
   {
     "id": "scene_07",
-    "caption": "The sample safety check spots two products that may contain paracetamol. Ask your pharmacist to check the real labels before combining medicines.",
-    "speech": "The sample safety check spots two products that may contain paracetamol. Ask your pharmacist to check the real labels before combining medicines."
+    "caption": "The sample safety check spots two products that may contain paracetamol, so ask your pharmacist to check the real labels before combining medicines.",
+    "speech": "The sample safety check spots two products that may contain paracetamol, so ask your pharmacist to check the real labels before combining medicines."
   },
   {
     "id": "scene_08",
-    "caption": "The sample also shows that two medicines may increase drowsiness when taken together. Ask your pharmacist, and do not use this as a diagnosis or dose change.",
-    "speech": "The sample also shows that two medicines may increase drowsiness when taken together. Ask your pharmacist, and do not use this as a diagnosis or dose change."
+    "caption": "The sample also shows that two medicines may increase drowsiness when taken together, so ask your pharmacist and do not use this as a diagnosis or dose change.",
+    "speech": "The sample also shows that two medicines may increase drowsiness when taken together, so ask your pharmacist and do not use this as a diagnosis or dose change."
   },
   {
     "id": "scene_09",
-    "caption": "You can switch explanations to Hindi and Marathi. Medicine names stay in English to help match the packaging.",
-    "speech": "You can switch explanations to Hindi and Marathi. Medicine names stay in English to help match the packaging."
+    "caption": "MedClear can explain in other languages while medicine names stay in English.",
+    "speech": "MedClear can explain in other languages while medicine names stay in English."
   },
   {
     "id": "scene_10",
-    "caption": "MedClear cannot diagnose or replace professional advice. Always confirm medicine instructions with your doctor or pharmacist.",
-    "speech": "MedClear cannot diagnose or replace professional advice. Always confirm medicine instructions with your doctor or pharmacist."
+    "caption": "MedClear cannot diagnose or replace professional advice, so always confirm medicine instructions with your doctor or pharmacist.",
+    "speech": "MedClear cannot diagnose or replace professional advice, so always confirm medicine instructions with your doctor or pharmacist."
   }
 ]

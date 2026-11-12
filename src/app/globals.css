@@ -779,7 +779,18 @@ h1 {
   outline-offset: 4px;
   position: relative;
   z-index: 1000;
-  animation: tour-highlight-pulse 1.1s ease-in-out infinite alternate;
+  animation: tour-highlight-pulse 0.55s ease-in-out infinite alternate;
+}
+
+.translation-disclaimer {
+  background: #eef7f4;
+  border-left: 4px solid #2f8277;
+  border-radius: 7px;
+  color: #244b48;
+  font-size: 16px;
+  font-weight: 650;
+  margin: 14px 0 20px;
+  padding: 12px 14px;
 }
 
 @keyframes tour-highlight-pulse {

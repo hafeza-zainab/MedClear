@@ -3,6 +3,7 @@
 import { ChangeEvent, FormEvent, useEffect, useState } from "react";
 import sampleData from "@/data/sample-analysis.json";
 import { useRouter } from "next/navigation";
+import { getLanguage, LANGUAGES } from "@/lib/languages";
 
 const ACCEPTED = ["image/jpeg", "image/png", "image/webp"];
 const MAX_FILE_BYTES = 20 * 1024 * 1024;
@@ -32,7 +33,9 @@ export default function ScanForm() {
   const [language, setLanguage] = useState("en");
 
   useEffect(() => {
-    setLanguage(localStorage.getItem("medclear-language") || "en");
+    const savedLanguage = getLanguage(localStorage.getItem("medclear-language")).code;
+    setLanguage(savedLanguage);
+    localStorage.setItem("medclear-language", savedLanguage);
   }, []);
 
   useEffect(() => {
@@ -84,11 +87,7 @@ export default function ScanForm() {
   }
 
   function trySample() {
-    const selectedSample = language === "hi"
-      ? sampleData.translations.hi.analysis
-      : language === "mr"
-        ? sampleData.translations.mr.analysis
-        : sampleData.analysis;
+    const selectedSample = language === "en" ? sampleData.analysis : sampleData.translations[language as "es" | "fr"].analysis;
     sessionStorage.setItem("medclear-analysis", JSON.stringify(selectedSample));
     sessionStorage.setItem("medclear-demo", "true");
     router.push("/results");
@@ -98,7 +97,7 @@ export default function ScanForm() {
     <form className="upload-form" onSubmit={onSubmit}>
       <label className="language-field" htmlFor="scan-language">Explanation language
         <select id="scan-language" value={language} onChange={(event) => { setLanguage(event.target.value); localStorage.setItem("medclear-language", event.target.value); }}>
-          <option value="en">English</option><option value="hi">हिन्दी</option><option value="mr">मराठी</option>
+          {LANGUAGES.map((option) => <option key={option.code} value={option.code}>{option.label}</option>)}
         </select>
       </label>
       <label className={`upload-box${preview ? " has-preview" : ""}`} htmlFor="medicine-image" data-tour="scan-preview">

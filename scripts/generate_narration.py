@@ -7,17 +7,18 @@ import asyncio
 import hashlib
 import json
 import re
+import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.error import HTTPError, URLError
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
 
 # Change these defaults to configure generated narration. Use `edge-tts --list-voices` to browse.
 VOICE = "en-IN-NeerjaNeural"
-RATE = "+0%"
+RATE = "+8%"
+SILENCE_FILTER = "silenceremove=start_periods=1:start_duration=0.05:start_threshold=-50dB,areverse,silenceremove=start_periods=1:start_duration=0.05:start_threshold=-50dB,areverse"
 
 PRONUNCIATIONS = {
-    "Hindi/Marathi": "Hindi and Marathi",
     "MedClear": "Med Clear",
     "AI": "A I",
     "UI": "U I",
@@ -25,7 +26,8 @@ PRONUNCIATIONS = {
 }
 
 SAMPLE_VOICES = ("en-IN-NeerjaNeural", "en-IN-PrabhatNeural", "en-US-AriaNeural")
-SAMPLE_TEXT = "MedClear makes medicine information clearer. You can switch explanations to Hindi and Marathi."
+SAMPLE_TEXT = "MedClear makes medicine information clearer. You can switch explanations to other languages."
+NAME_VARIANTS = ("Med Clear", "Medd Clear", "Med, Clear", "Meddy Clear", "M E D Clear")
 ROOT = Path(__file__).resolve().parents[1]
 SCENES_FILE = ROOT / "src" / "data" / "demo-scenes.json"
 OUTPUT_DIR = ROOT / "public" / "audio"
@@ -71,6 +73,11 @@ def speech_hash(text: str, voice: str, rate: str) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
+def pronunciation_hash() -> str:
+    payload = json.dumps(PRONUNCIATIONS, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
 def load_scenes() -> list[dict[str, str]]:
     try:
         scenes = json.loads(SCENES_FILE.read_text(encoding="utf-8"))
@@ -96,27 +103,55 @@ def load_manifest() -> dict:
 
 def check_internet() -> None:
     try:
-        with urlopen("https://www.microsoft.com", timeout=8):
+        with urlopen(Request("https://www.microsoft.com", method="HEAD"), timeout=5):
             pass
     except HTTPError:
         # An HTTP response, including an error response, confirms connectivity.
         pass
     except (OSError, URLError, TimeoutError) as error:
-        raise SystemExit(f"Narration generation needs internet access, but the connection failed: {error}") from error
+        print(f"Internet check was inconclusive ({error}); trying Edge TTS. Generation will report clearly if it cannot connect.")
 
 
 async def generate_clip(edge_tts, text: str, voice: str, output: Path) -> None:
+    raw_output = output.with_name(f"{output.stem}.raw.mp3")
     try:
-        await asyncio.wait_for(edge_tts.Communicate(text, voice, rate=RATE).save(str(output)), timeout=30)
+        await asyncio.wait_for(edge_tts.Communicate(text, voice, rate=RATE).save(str(raw_output)), timeout=30)
+        trim_silence(raw_output, output)
+        raw_output.unlink(missing_ok=True)
     except TimeoutError as error:
+        raw_output.unlink(missing_ok=True)
         output.unlink(missing_ok=True)
         raise SystemExit(f"Timed out generating {output.name}. Check your internet connection and try again.") from error
+    except SystemExit:
+        raw_output.unlink(missing_ok=True)
+        output.unlink(missing_ok=True)
+        raise
     except Exception as error:  # edge-tts wraps service and network failures.
+        raw_output.unlink(missing_ok=True)
         output.unlink(missing_ok=True)
         raise SystemExit(
             f"Could not generate {output.name}: {error}\n"
             "Check that edge-tts is installed and that you have an internet connection."
         ) from error
+
+
+def trim_silence(source: Path, output: Path) -> None:
+    try:
+        import imageio_ffmpeg
+    except ModuleNotFoundError as error:
+        raise SystemExit("imageio-ffmpeg is missing. Install it with `pip install -r requirements-dev.txt`.") from error
+    ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
+    command = [
+        ffmpeg, "-hide_banner", "-loglevel", "error", "-y", "-i", str(source),
+        "-af", SILENCE_FILTER,
+        "-c:a", "libmp3lame", "-q:a", "4", str(output),
+    ]
+    try:
+        result = subprocess.run(command, capture_output=True, text=True, timeout=30, check=False)
+    except (OSError, subprocess.TimeoutExpired) as error:
+        raise SystemExit(f"Could not trim silence from {output.name} with bundled ffmpeg: {error}") from error
+    if result.returncode != 0:
+        raise SystemExit(f"Could not trim silence from {output.name} with bundled ffmpeg: {result.stderr.strip() or 'ffmpeg failed'}")
 
 
 def load_edge_tts():
@@ -138,6 +173,16 @@ async def generate_sample(edge_tts) -> None:
         output = sample_dir / f"{voice}.mp3"
         await generate_clip(edge_tts, speech, voice, output)
         print(f"Created {output.relative_to(ROOT)}")
+
+
+async def generate_name_tests(edge_tts) -> None:
+    check_internet()
+    sample_dir = OUTPUT_DIR / "voice-samples"
+    sample_dir.mkdir(parents=True, exist_ok=True)
+    for index, variant in enumerate(NAME_VARIANTS, start=1):
+        output = sample_dir / f"name-{index:02d}.mp3"
+        await generate_clip(edge_tts, variant, VOICE, output)
+        print(f"{variant}: {output.resolve()}")
 
 
 async def generate_scenes(edge_tts, force: bool) -> None:
@@ -169,6 +214,8 @@ async def generate_scenes(edge_tts, force: bool) -> None:
     manifest = {
         "updated_at": datetime.now(timezone.utc).isoformat(),
         "hash_format": "sha256(speech + NUL + voice + NUL + rate)",
+        "pronunciation_hash": pronunciation_hash(),
+        "silence_filter_hash": hashlib.sha256(SILENCE_FILTER.encode("utf-8")).hexdigest(),
         "scenes": records,
     }
     temp_file = MANIFEST_FILE.with_suffix(".json.tmp")
@@ -181,9 +228,14 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Generate MP3 narration for MedClear's local demo tour.")
     parser.add_argument("--force", action="store_true", help="Regenerate every scene MP3.")
     parser.add_argument("--sample", action="store_true", help="Generate one short clip in three comparison voices.")
+    parser.add_argument("--test-name", action="store_true", help="Generate name-pronunciation comparison clips in the current voice.")
     args = parser.parse_args()
     edge_tts = load_edge_tts()
-    if args.sample:
+    if args.sample and args.test_name:
+        parser.error("Use either --sample or --test-name, not both.")
+    if args.test_name:
+        asyncio.run(generate_name_tests(edge_tts))
+    elif args.sample:
         asyncio.run(generate_sample(edge_tts))
     else:
         asyncio.run(generate_scenes(edge_tts, args.force))

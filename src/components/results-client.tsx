@@ -8,6 +8,12 @@ import sampleData from "@/data/sample-analysis.json";
 import Schedule from "@/components/schedule";
 import SafetyCheck from "@/components/safety-check";
 import StepIndicator from "@/components/step-indicator";
+import { getLanguage, LANGUAGES } from "@/lib/languages";
+
+function getSampleTranslation(code: string) {
+  if (code === "en") return undefined;
+  return sampleData.translations[code as keyof typeof sampleData.translations];
+}
 
 function TimingIcon({ timing }: { timing: string }) {
   const value = timing.toLowerCase();
@@ -75,12 +81,13 @@ export default function ResultsClient() {
   const [demoSafety, setDemoSafety] = useState<SafetyResult | undefined>();
 
   useEffect(() => {
-    const savedLanguage = localStorage.getItem("medclear-language") || "en";
+    const savedLanguage = getLanguage(localStorage.getItem("medclear-language")).code;
     setLanguage(savedLanguage);
+    localStorage.setItem("medclear-language", savedLanguage);
     const isDemo = sessionStorage.getItem("medclear-demo") === "true";
     setDemoMode(isDemo);
     if (isDemo) {
-      const localized = savedLanguage === "hi" ? sampleData.translations.hi : savedLanguage === "mr" ? sampleData.translations.mr : undefined;
+      const localized = getSampleTranslation(savedLanguage);
       const demoAnalysis = localized?.analysis ?? sampleData.analysis;
       setAnalysis(demoAnalysis as Analysis);
       setDemoSafety((localized?.safety ?? sampleData.safety) as SafetyResult);
@@ -102,7 +109,7 @@ export default function ResultsClient() {
     setLanguageError("");
     if (!analysis || nextLanguage === language) return;
     if (demoMode) {
-      const localized = nextLanguage === "hi" ? sampleData.translations.hi : nextLanguage === "mr" ? sampleData.translations.mr : undefined;
+      const localized = getSampleTranslation(nextLanguage);
       const demoAnalysis = localized?.analysis ?? sampleData.analysis;
       setAnalysis(demoAnalysis as Analysis);
       setDemoSafety((localized?.safety ?? sampleData.safety) as SafetyResult);
@@ -135,7 +142,8 @@ export default function ResultsClient() {
       <section className="results-content">
         <StepIndicator active="Review" />
         <a className="back-link" href="/scan">← Scan another photo</a>
-        <div className="results-toolbar"><div className="eyebrow"><span className="eyebrow-dot" /> Your medicine notes</div><label className="language-field" htmlFor="results-language">Language<select id="results-language" data-tour="language-switcher" value={language} disabled={translating} onChange={(event) => void changeLanguage(event.target.value)}><option value="en">English</option><option value="hi">हिन्दी</option><option value="mr">मराठी</option></select></label></div>
+        <div className="results-toolbar"><div className="eyebrow"><span className="eyebrow-dot" /> Your medicine notes</div><label className="language-field" htmlFor="results-language">Language<select id="results-language" data-tour="language-switcher" value={language} disabled={translating} onChange={(event) => void changeLanguage(event.target.value)}>{LANGUAGES.map((option) => <option key={option.code} value={option.code}>{option.label}</option>)}</select></label></div>
+        {language !== "en" && <p className="translation-disclaimer">AI-generated translation, please confirm with a pharmacist.</p>}
         {translating && <p className="loading-note" role="status">Changing language…</p>}
         {languageError && <p className="form-error" role="alert">{languageError}</p>}
         {demoMode && <p className="demo-notice">Sample demonstration result · no prescription was analyzed.</p>}

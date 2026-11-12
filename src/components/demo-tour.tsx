@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import scenes from "@/data/demo-scenes.json";
+import { getLanguage, LANGUAGES } from "@/lib/languages";
 
 const PACE = 1.25;
 const TOUR_KEY = "medclear-demo-tour-state";
@@ -130,13 +131,14 @@ export default function DemoTour() {
   const finish = useCallback(() => {
     if (finishCalledRef.current) return;
     finishCalledRef.current = true;
+    abortRef.current?.abort();
     releaseAudio();
     highlightedRef.current?.classList.remove("tour-highlight");
     highlightedRef.current = null;
     const saved = tourRef.current;
     if (saved) {
       if (saved.language === null) localStorage.removeItem("medclear-language");
-      else localStorage.setItem("medclear-language", saved.language);
+      else localStorage.setItem("medclear-language", getLanguage(saved.language).code);
       if (saved.takenValue === null) localStorage.removeItem(saved.takenKey);
       else localStorage.setItem(saved.takenKey, saved.takenValue);
       for (const key of TOUR_STORAGE_KEYS) {
@@ -253,9 +255,9 @@ export default function DemoTour() {
     } else if (sceneId === "scene_09") {
       const language = await waitFor('[data-tour="language-switcher"]', signal);
       focusOn(language);
-      selectValue(language, "hi");
+      selectValue(language, LANGUAGES[1].code);
       await sleep(120, signal);
-      selectValue(language, "mr");
+      selectValue(language, LANGUAGES[2].code);
     } else {
       focusOn(await waitFor('[data-tour="closing-disclaimer"]', signal));
     }
@@ -268,6 +270,8 @@ export default function DemoTour() {
     const controller = new AbortController();
     abortRef.current = controller;
     const signal = controller.signal;
+    const timings: { scene: string; audioMs: number | null; actionsMs: number; idleGapBeforeNextMs: number | null }[] = [];
+    let previousSceneFinishedAt = 0;
     try {
       setActive(true);
       setStartedAt(initialState.startedAt);
@@ -280,24 +284,41 @@ export default function DemoTour() {
         await waitFor('[data-tour="demo-caption"]', signal);
         await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
         const sceneStarted = Date.now();
+        if (timings.length) timings[timings.length - 1].idleGapBeforeNextMs = Math.max(0, sceneStarted - previousSceneFinishedAt);
         const narration = playNarration(scene);
         preload(scenes[index + 1]);
         const actionsStarted = Date.now();
         const actionsPromise = runSceneActions(scene.id, signal);
-        const results = await Promise.all([actionsPromise, narration.started]);
-        const audioStarted = results[1];
+        let audioStarted = false;
+        const fallbackController = new AbortController();
+        const abortFallback = () => fallbackController.abort();
+        signal.addEventListener("abort", abortFallback, { once: true });
+        const fallbackClock = wait(NO_AUDIO_FALLBACK_MS[index], fallbackController.signal).then(() => true, () => false);
+        const narrationClock = narration.started.then(async (playbackStarted) => {
+          if (!playbackStarted) {
+            await fallbackClock;
+            return false;
+          }
+          audioStarted = true;
+          fallbackController.abort();
+          await fallbackClock;
+          return narration.ended;
+        });
+        await Promise.all([actionsPromise, narrationClock]);
+        signal.removeEventListener("abort", abortFallback);
         const actionsMs = Date.now() - actionsStarted;
-        const audioEnded = audioStarted ? await narration.ended : false;
-        if (!audioEnded) await wait(NO_AUDIO_FALLBACK_MS[index], signal);
-        const sceneMs = Date.now() - sceneStarted;
-        if (process.env.NODE_ENV === "development") {
-          console.info(`[MedClear demo] ${scene.id}: total ${sceneMs} ms, actions ${actionsMs} ms, audio ${narration.durationMs()} ms${audioEnded ? "" : ", timed fallback"}`);
-        }
-        if (index < scenes.length - 1) await sleep(400, signal);
+        timings.push({
+          scene: scene.id,
+          audioMs: audioStarted ? narration.durationMs() : null,
+          actionsMs,
+          idleGapBeforeNextMs: null,
+        });
+        previousSceneFinishedAt = Date.now();
       }
     } catch (error) {
       if (!(error instanceof Error) || error.message !== "stopped") console.error("MedClear demo tour ended early", error);
     } finally {
+      if (process.env.NODE_ENV === "development") console.table(timings);
       finish();
     }
   }, [finish, playNarration, preload, runSceneActions, saveTour]);

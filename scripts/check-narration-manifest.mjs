@@ -16,8 +16,19 @@ function pythonConstant(name) {
   return match?.[1] ?? null;
 }
 
+function pythonPronunciationMap() {
+  const block = generator.match(/^PRONUNCIATIONS\s*=\s*\{([\s\S]*?)^\}/m)?.[1];
+  if (!block) return null;
+  const entries = [...block.matchAll(/["']([^"']+)["']\s*:\s*["']([^"']*)["']/g)]
+    .map((match) => [match[1], match[2]])
+    .sort(([left], [right]) => left.localeCompare(right, "en"));
+  return Object.fromEntries(entries);
+}
+
 const currentVoice = pythonConstant("VOICE");
 const currentRate = pythonConstant("RATE");
+const silenceFilter = pythonConstant("SILENCE_FILTER");
+const currentPronunciations = pythonPronunciationMap();
 const issues = [];
 
 if (scenes.length !== 10) issues.push(`expected ten scenes, found ${scenes.length}`);
@@ -29,6 +40,15 @@ if (!existsSync(manifestPath)) {
   issues.push("audio manifest is missing");
 } else {
   const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+  if (!currentPronunciations || !manifest.pronunciation_hash) {
+    issues.push("pronunciation hash is missing");
+  } else {
+    const pronunciationHash = createHash("sha256").update(JSON.stringify(currentPronunciations), "utf8").digest("hex");
+    if (manifest.pronunciation_hash !== pronunciationHash) issues.push("speech pronunciation map changed");
+  }
+  if (!silenceFilter || manifest.silence_filter_hash !== createHash("sha256").update(silenceFilter, "utf8").digest("hex")) {
+    issues.push("audio silence-trimming filter changed");
+  }
   for (const scene of scenes) {
     const record = manifest.scenes?.[scene.id];
     if (!record) {

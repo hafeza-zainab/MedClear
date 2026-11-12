@@ -1,52 +1,289 @@
 {
   "analysis": {
     "medicines": [
-      {"name":"Cetirizine","strength":"10 mg","purpose":"An antihistamine commonly used for allergy symptoms.","how_to_take":"In this fictional example, follow the directions shown on the sample label.","frequency_per_day":1,"timing":"Night","duration":"Not specified in this sample.","common_side_effects":["Sleepiness","Dry mouth"],"cautions":["It may cause drowsiness. Ask a pharmacist whether it is suitable with your other medicines."]},
-      {"name":"Paracetamol tablet","strength":"500 mg","purpose":"A pain reliever and fever reducer.","how_to_take":"This sample shows an example dose instruction; follow your own prescription instead.","frequency_per_day":1,"timing":"Morning after food","duration":"Not specified in this sample.","common_side_effects":[],"cautions":["Check whether other products also contain paracetamol."]},
-      {"name":"Cold & Flu tablet (contains paracetamol)","strength":"500 mg paracetamol","purpose":"A fictional combination product included to demonstrate a possible duplicate ingredient alert.","how_to_take":"This sample is for demonstration only; use real products only as directed by a clinician or pharmacist.","frequency_per_day":1,"timing":"Afternoon after food","duration":"Not specified in this sample.","common_side_effects":[],"cautions":["Combination products can contain ingredients also found in other medicines."]},
-      {"name":"Diphenhydramine","strength":"25 mg","purpose":"An antihistamine that may cause drowsiness.","how_to_take":"Included only to demonstrate a sample interaction warning; do not use this example as a treatment plan.","frequency_per_day":1,"timing":"Night","duration":"Not specified in this sample.","common_side_effects":["Sleepiness","Dry mouth"],"cautions":["Ask a pharmacist before combining with other medicines that may cause drowsiness."]}
+      {
+        "name": "Cetirizine",
+        "strength": "10 mg",
+        "purpose": "An antihistamine commonly used for allergy symptoms.",
+        "how_to_take": "In this fictional example, follow the directions shown on the sample label.",
+        "frequency_per_day": 1,
+        "timing": "Night",
+        "duration": "Not specified in this sample.",
+        "common_side_effects": [
+          "Sleepiness",
+          "Dry mouth"
+        ],
+        "cautions": [
+          "It may cause drowsiness. Ask a pharmacist whether it is suitable with your other medicines."
+        ]
+      },
+      {
+        "name": "Paracetamol tablet",
+        "strength": "500 mg",
+        "purpose": "A pain reliever and fever reducer.",
+        "how_to_take": "This sample shows an example dose instruction; follow your own prescription instead.",
+        "frequency_per_day": 1,
+        "timing": "Morning after food",
+        "duration": "Not specified in this sample.",
+        "common_side_effects": [],
+        "cautions": [
+          "Check whether other products also contain paracetamol."
+        ]
+      },
+      {
+        "name": "Cold & Flu tablet (contains paracetamol)",
+        "strength": "500 mg paracetamol",
+        "purpose": "A fictional combination product included to demonstrate a possible duplicate ingredient alert.",
+        "how_to_take": "This sample is for demonstration only; use real products only as directed by a clinician or pharmacist.",
+        "frequency_per_day": 1,
+        "timing": "Afternoon after food",
+        "duration": "Not specified in this sample.",
+        "common_side_effects": [],
+        "cautions": [
+          "Combination products can contain ingredients also found in other medicines."
+        ]
+      },
+      {
+        "name": "Diphenhydramine",
+        "strength": "25 mg",
+        "purpose": "An antihistamine that may cause drowsiness.",
+        "how_to_take": "Included only to demonstrate a sample interaction warning; do not use this example as a treatment plan.",
+        "frequency_per_day": 1,
+        "timing": "Night",
+        "duration": "Not specified in this sample.",
+        "common_side_effects": [
+          "Sleepiness",
+          "Dry mouth"
+        ],
+        "cautions": [
+          "Ask a pharmacist before combining with other medicines that may cause drowsiness."
+        ]
+      }
     ],
-    "general_notes":["This built-in sample is fictional demonstration content, not a real prescription or treatment advice."],
-    "unreadable_parts":["The sample prescriber's name and date are intentionally blurred in this demo."]
+    "general_notes": [
+      "This built-in sample is fictional demonstration content, not a real prescription or treatment advice."
+    ],
+    "unreadable_parts": [
+      "The sample prescriber's name and date are intentionally blurred in this demo."
+    ]
   },
   "safety": {
-    "duplicate_ingredients":[{"ingredient":"Paracetamol","medicines":["Paracetamol tablet","Cold & Flu tablet (contains paracetamol)"],"explanation":"These sample products may both contain paracetamol. Ask your pharmacist to check the actual labels before taking products together."}],
-    "interactions":[{"medicines":["Cetirizine","Diphenhydramine"],"severity":"Ask pharmacist","warning":"Taking these sedating antihistamines together may increase drowsiness. Ask your pharmacist before combining them."}],
-    "ask_pharmacist":["Do any of my real products contain the same active ingredient?","Could these medicines together increase drowsiness for me?"]
+    "duplicate_ingredients": [
+      {
+        "ingredient": "Paracetamol",
+        "medicines": [
+          "Paracetamol tablet",
+          "Cold & Flu tablet (contains paracetamol)"
+        ],
+        "explanation": "These sample products may both contain paracetamol. Ask your pharmacist to check the actual labels before taking products together."
+      }
+    ],
+    "interactions": [
+      {
+        "medicines": [
+          "Cetirizine",
+          "Diphenhydramine"
+        ],
+        "severity": "Ask pharmacist",
+        "warning": "Taking these sedating antihistamines together may increase drowsiness. Ask your pharmacist before combining them."
+      }
+    ],
+    "ask_pharmacist": [
+      "Do any of my real products contain the same active ingredient?",
+      "Could these medicines together increase drowsiness for me?"
+    ]
   },
   "translations": {
-    "hi": {
+    "es": {
       "analysis": {
         "medicines": [
-          {"name":"Cetirizine","strength":"10 mg","purpose":"एलर्जी के लक्षणों में इस्तेमाल होने वाली एंटीहिस्टामिन दवा।","how_to_take":"इस काल्पनिक उदाहरण में, नमूना लेबल पर दिए निर्देश देखें।","frequency_per_day":1,"timing":"Night","duration":"इस नमूने में अवधि नहीं दी गई है।","common_side_effects":["नींद आना","मुंह सूखना"],"cautions":["इससे उनींदापन हो सकता है। अपनी अन्य दवाओं के साथ इसकी उपयुक्तता फार्मासिस्ट से पूछें।"]},
-          {"name":"Paracetamol tablet","strength":"500 mg","purpose":"दर्द कम करने और बुखार घटाने की दवा।","how_to_take":"यह नमूना केवल उदाहरण के लिए है; अपनी दवा के लिए अपने डॉक्टर के पर्चे का पालन करें।","frequency_per_day":1,"timing":"Morning after food","duration":"इस नमूने में अवधि नहीं दी गई है।","common_side_effects":[],"cautions":["जांचें कि क्या अन्य उत्पादों में भी पैरासिटामोल है।"]},
-          {"name":"Cold & Flu tablet (contains paracetamol)","strength":"500 mg paracetamol","purpose":"संभावित दोहरे घटक की चेतावनी दिखाने के लिए शामिल एक काल्पनिक संयोजन उत्पाद।","how_to_take":"यह केवल प्रदर्शन के लिए है; वास्तविक उत्पाद डॉक्टर या फार्मासिस्ट के निर्देशानुसार ही लें।","frequency_per_day":1,"timing":"Afternoon after food","duration":"इस नमूने में अवधि नहीं दी गई है।","common_side_effects":[],"cautions":["संयोजन वाली दवाओं में ऐसे घटक हो सकते हैं जो दूसरी दवाओं में भी हों।"]},
-          {"name":"Diphenhydramine","strength":"25 mg","purpose":"एक एंटीहिस्टामिन दवा जिससे उनींदापन हो सकता है।","how_to_take":"यह केवल नमूना चेतावनी दिखाने के लिए है; इसे उपचार योजना न मानें।","frequency_per_day":1,"timing":"Night","duration":"इस नमूने में अवधि नहीं दी गई है।","common_side_effects":["नींद आना","मुंह सूखना"],"cautions":["उनींदापन करने वाली दूसरी दवाओं के साथ लेने से पहले फार्मासिस्ट से पूछें।"]}
+          {
+            "name": "Cetirizine",
+            "strength": "10 mg",
+            "purpose": "Antihistamínico de uso común para los síntomas de alergia.",
+            "how_to_take": "Dans cet exemple fictif, suivez les indications figurant sur l’étiquette fournie.",
+            "frequency_per_day": 1,
+            "timing": "Night",
+            "duration": "No especificada en este ejemplo.",
+            "common_side_effects": [
+              "Somnolencia",
+              "Sequedad de boca"
+            ],
+            "cautions": [
+              "Puede causar somnolencia. Pregunte a un farmacéutico si es adecuado junto con sus otros medicamentos."
+            ]
+          },
+          {
+            "name": "Paracetamol tablet",
+            "strength": "500 mg",
+            "purpose": "Analgésico y medicamento para reducir la fiebre.",
+            "how_to_take": "Cet exemple montre une instruction de dose fictive. Suivez plutôt votre propre ordonnance.",
+            "frequency_per_day": 1,
+            "timing": "Morning after food",
+            "duration": "No especificada en este ejemplo.",
+            "common_side_effects": [],
+            "cautions": [
+              "Compruebe si otros productos también contienen paracetamol."
+            ]
+          },
+          {
+            "name": "Cold & Flu tablet (contains paracetamol)",
+            "strength": "500 mg paracetamol",
+            "purpose": "Producto combinado ficticio incluido para mostrar una posible alerta por ingrediente duplicado.",
+            "how_to_take": "Cet exemple est fourni à titre de démonstration. Utilisez les vrais produits uniquement selon les indications d’un professionnel de santé ou d’un pharmacien.",
+            "frequency_per_day": 1,
+            "timing": "Afternoon after food",
+            "duration": "No especificada en este ejemplo.",
+            "common_side_effects": [],
+            "cautions": [
+              "Los productos combinados pueden contener ingredientes que también están presentes en otros medicamentos."
+            ]
+          },
+          {
+            "name": "Diphenhydramine",
+            "strength": "25 mg",
+            "purpose": "Antihistamínico que puede causar somnolencia.",
+            "how_to_take": "Inclus uniquement pour illustrer une alerte d’interaction. N’utilisez pas cet exemple comme plan de traitement.",
+            "frequency_per_day": 1,
+            "timing": "Night",
+            "duration": "No especificada en este ejemplo.",
+            "common_side_effects": [
+              "Somnolencia",
+              "Sequedad de boca"
+            ],
+            "cautions": [
+              "Consulte a un farmacéutico antes de combinarlo con otros medicamentos que puedan causar somnolencia."
+            ]
+          }
         ],
-        "general_notes":["यह नमूना काल्पनिक प्रदर्शन सामग्री है, वास्तविक पर्चा या उपचार सलाह नहीं।"],
-        "unreadable_parts":["इस डेमो में नमूना लिखने वाले का नाम और तारीख जानबूझकर धुंधली रखी गई है।"]
+        "general_notes": [
+          "Este ejemplo integrado es ficticio y solo sirve para una demostración. No es una receta real ni un consejo de tratamiento."
+        ],
+        "unreadable_parts": [
+          "El nombre del profesional y la fecha del ejemplo se han difuminado intencionadamente en esta demostración."
+        ]
       },
       "safety": {
-        "duplicate_ingredients":[{"ingredient":"Paracetamol","medicines":["Paracetamol tablet","Cold & Flu tablet (contains paracetamol)"],"explanation":"इन नमूना उत्पादों में दोनों में पैरासिटामोल हो सकता है। इन्हें साथ लेने से पहले वास्तविक लेबल फार्मासिस्ट से जांचें।"}],
-        "interactions":[{"medicines":["Cetirizine","Diphenhydramine"],"severity":"Ask pharmacist","warning":"इनसे उनींदापन हो सकता है और साथ लेने पर यह बढ़ सकता है। इन्हें मिलाने से पहले फार्मासिस्ट से पूछें।"}],
-        "ask_pharmacist":["क्या मेरे वास्तविक उत्पादों में एक ही सक्रिय घटक है?","क्या ये दवाएं साथ लेने पर मेरे लिए उनींदापन बढ़ा सकती हैं?"]
+        "duplicate_ingredients": [
+          {
+            "ingredient": "Paracetamol",
+            "medicines": [
+              "Paracetamol tablet",
+              "Cold & Flu tablet (contains paracetamol)"
+            ],
+            "explanation": "Estos productos de ejemplo podrían contener paracetamol. Pida a su farmacéutico que compruebe las etiquetas reales antes de combinarlos."
+          }
+        ],
+        "interactions": [
+          {
+            "medicines": [
+              "Cetirizine",
+              "Diphenhydramine"
+            ],
+            "severity": "Ask pharmacist",
+            "warning": "Tomar estos antihistamínicos sedantes juntos podría aumentar la somnolencia. Consulte a su farmacéutico antes de combinarlos."
+          }
+        ],
+        "ask_pharmacist": [
+          "¿Contienen alguno de mis productos reales el mismo principio activo?",
+          "¿Podrían estos medicamentos aumentar la somnolencia si se toman juntos?"
+        ]
       }
     },
-    "mr": {
+    "fr": {
       "analysis": {
         "medicines": [
-          {"name":"Cetirizine","strength":"10 mg","purpose":"अॅलर्जीच्या लक्षणांसाठी वापरले जाणारे अँटीहिस्टामिन औषध.","how_to_take":"या काल्पनिक उदाहरणात नमुना लेबलवरील सूचना पाहा.","frequency_per_day":1,"timing":"Night","duration":"या नमुन्यात कालावधी दिलेला नाही.","common_side_effects":["झोप येणे","तोंड कोरडे पडणे"],"cautions":["यामुळे गुंगी येऊ शकते. इतर औषधांसोबत हे योग्य आहे का ते फार्मासिस्टला विचारा."]},
-          {"name":"Paracetamol tablet","strength":"500 mg","purpose":"वेदना कमी करण्यासाठी आणि ताप उतरवण्यासाठी वापरले जाणारे औषध.","how_to_take":"हा नमुना फक्त उदाहरणासाठी आहे; स्वतःच्या औषधांसाठी डॉक्टरांच्या चिठ्ठीतील सूचना पाळा.","frequency_per_day":1,"timing":"Morning after food","duration":"या नमुन्यात कालावधी दिलेला नाही.","common_side_effects":[],"cautions":["इतर उत्पादनांमध्येही पॅरासिटामॉल आहे का ते तपासा."]},
-          {"name":"Cold & Flu tablet (contains paracetamol)","strength":"500 mg paracetamol","purpose":"एकाच घटकाची पुनरावृत्ती होण्याची शक्यता दाखवण्यासाठी समाविष्ट केलेले काल्पनिक मिश्र औषध.","how_to_take":"हे फक्त प्रात्यक्षिकासाठी आहे; खरे उत्पादन डॉक्टर किंवा फार्मासिस्टच्या सूचनेनुसारच घ्या.","frequency_per_day":1,"timing":"Afternoon after food","duration":"या नमुन्यात कालावधी दिलेला नाही.","common_side_effects":[],"cautions":["मिश्र औषधांमध्ये इतर औषधांतही असणारे घटक असू शकतात."]},
-          {"name":"Diphenhydramine","strength":"25 mg","purpose":"गुंगी आणू शकणारे अँटीहिस्टामिन औषध.","how_to_take":"हे फक्त नमुना परस्परसंवाद दाखवण्यासाठी आहे; उपचार योजना म्हणून वापरू नका.","frequency_per_day":1,"timing":"Night","duration":"या नमुन्यात कालावधी दिलेला नाही.","common_side_effects":["झोप येणे","तोंड कोरडे पडणे"],"cautions":["गुंगी आणणाऱ्या इतर औषधांसोबत घेण्यापूर्वी फार्मासिस्टला विचारा."]}
+          {
+            "name": "Cetirizine",
+            "strength": "10 mg",
+            "purpose": "Antihistaminique couramment utilisé contre les symptômes d’allergie.",
+            "how_to_take": "Dans cet exemple fictif, suivez les indications de l’étiquette fournie.",
+            "frequency_per_day": 1,
+            "timing": "Night",
+            "duration": "Non précisée dans cet exemple.",
+            "common_side_effects": [
+              "Somnolence",
+              "Bouche sèche"
+            ],
+            "cautions": [
+              "Peut provoquer de la somnolence. Demandez à un pharmacien si ce médicament convient avec vos autres médicaments."
+            ]
+          },
+          {
+            "name": "Paracetamol tablet",
+            "strength": "500 mg",
+            "purpose": "Antalgique et médicament contre la fièvre.",
+            "how_to_take": "Cet exemple montre une instruction de dose fictive. Suivez plutôt votre propre ordonnance.",
+            "frequency_per_day": 1,
+            "timing": "Morning after food",
+            "duration": "Non précisée dans cet exemple.",
+            "common_side_effects": [],
+            "cautions": [
+              "Vérifiez si d’autres produits contiennent également du paracétamol."
+            ]
+          },
+          {
+            "name": "Cold & Flu tablet (contains paracetamol)",
+            "strength": "500 mg paracetamol",
+            "purpose": "Produit combiné fictif inclus pour illustrer une possible alerte de doublon d’ingrédient.",
+            "how_to_take": "Cet exemple sert uniquement à la démonstration. Utilisez les vrais produits uniquement selon les indications d’un professionnel de santé ou d’un pharmacien.",
+            "frequency_per_day": 1,
+            "timing": "Afternoon after food",
+            "duration": "Non précisée dans cet exemple.",
+            "common_side_effects": [],
+            "cautions": [
+              "Les produits combinés peuvent contenir des ingrédients également présents dans d’autres médicaments."
+            ]
+          },
+          {
+            "name": "Diphenhydramine",
+            "strength": "25 mg",
+            "purpose": "Antihistaminique pouvant provoquer de la somnolence.",
+            "how_to_take": "Inclus uniquement pour illustrer une alerte d’interaction. N’utilisez pas cet exemple comme plan de traitement.",
+            "frequency_per_day": 1,
+            "timing": "Night",
+            "duration": "Non précisée dans cet exemple.",
+            "common_side_effects": [
+              "Somnolence",
+              "Bouche sèche"
+            ],
+            "cautions": [
+              "Demandez conseil à un pharmacien avant de l’associer à d’autres médicaments pouvant provoquer de la somnolence."
+            ]
+          }
         ],
-        "general_notes":["हा नमुना काल्पनिक प्रात्यक्षिक मजकूर आहे; खरी प्रिस्क्रिप्शन किंवा उपचार सल्ला नाही."],
-        "unreadable_parts":["या डेमोमध्ये नमुना लिहिणाऱ्याचे नाव आणि तारीख जाणीवपूर्वक अस्पष्ट ठेवली आहे."]
+        "general_notes": [
+          "Cet exemple intégré est fictif et sert uniquement à une démonstration. Il ne s’agit pas d’une ordonnance réelle ni d’un conseil de traitement."
+        ],
+        "unreadable_parts": [
+          "Le nom du prescripteur et la date de l’exemple sont volontairement floutés dans cette démonstration."
+        ]
       },
       "safety": {
-        "duplicate_ingredients":[{"ingredient":"Paracetamol","medicines":["Paracetamol tablet","Cold & Flu tablet (contains paracetamol)"],"explanation":"या नमुना उत्पादनांमध्ये पॅरासिटामॉल असू शकते. ही उत्पादने एकत्र घेण्यापूर्वी प्रत्यक्ष लेबल फार्मासिस्टकडून तपासून घ्या."}],
-        "interactions":[{"medicines":["Cetirizine","Diphenhydramine"],"severity":"Ask pharmacist","warning":"या औषधांमुळे गुंगी येऊ शकते आणि एकत्र घेतल्यास ती वाढू शकते. एकत्र घेण्यापूर्वी फार्मासिस्टला विचारा."}],
-        "ask_pharmacist":["माझ्या खऱ्या उत्पादनांमध्ये एकच सक्रिय घटक आहे का?","ही औषधे एकत्र घेतल्यास माझी गुंगी वाढू शकते का?"]
+        "duplicate_ingredients": [
+          {
+            "ingredient": "Paracetamol",
+            "medicines": [
+              "Paracetamol tablet",
+              "Cold & Flu tablet (contains paracetamol)"
+            ],
+            "explanation": "Ces produits de démonstration pourraient tous deux contenir du paracétamol. Demandez à votre pharmacien de vérifier les vraies étiquettes avant de les associer."
+          }
+        ],
+        "interactions": [
+          {
+            "medicines": [
+              "Cetirizine",
+              "Diphenhydramine"
+            ],
+            "severity": "Ask pharmacist",
+            "warning": "La prise simultanée de ces antihistaminiques sédatifs pourrait accentuer la somnolence. Demandez conseil à votre pharmacien avant de les associer."
+          }
+        ],
+        "ask_pharmacist": [
+          "Mes vrais produits contiennent-ils le même principe actif ?",
+          "Ces médicaments pourraient-ils accentuer la somnolence s’ils sont pris ensemble ?"
+        ]
       }
     }
   }

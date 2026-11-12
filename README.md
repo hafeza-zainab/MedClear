@@ -17,7 +17,7 @@ MedClear accepts a photo and asks a vision-capable language model to extract onl
 - Upload or take a prescription/medicine photo, with a preview and client-side resize to a maximum 1600 px edge.
 - Server-side image analysis with schema-validated JSON output.
 - Medicine cards for purpose, visible instructions, common side effects, cautions, and unreadable parts.
-- English, Hindi, and Marathi explanation choices. Medicine names remain in English.
+- English, Spanish, and French explanation choices. Medicine names remain in English.
 - Daily timeline, local “Mark as taken” state, editable browser reminder times, and print/Save as PDF.
 - Cautious duplicate ingredient and common interaction review, with pharmacist questions.
 - Local sample result for a no-upload, no-analysis demonstration.
@@ -68,7 +68,7 @@ The routes call `{LLM_BASE_URL}/chat/completions`. Image input uses the OpenAI-c
 
 ## Narrated demo audio
 
-The demo captions and narration script share `src/data/demo-scenes.json`. Generated files live in `public/audio/` and are committed with the app so running MedClear and watching the demo needs neither Python nor an internet connection.
+The demo captions and narration script share `src/data/demo-scenes.json`. Narration is English only; the language scene shows localized on-screen text without speaking it. Generated files live in `public/audio/` and are committed with the app so running MedClear and watching the demo needs neither Python nor an internet connection.
 
 To generate or update the narration MP3s, use Python and install the development-only dependency:
 
@@ -77,7 +77,7 @@ pip install -r requirements-dev.txt
 python scripts/generate_narration.py
 ```
 
-Generation requires an internet connection. The script compares each scene's speech and voice hash with `public/audio/manifest.json`, regenerating missing or stale files; use `python scripts/generate_narration.py --force` to regenerate all scenes. The build logs a prominent warning when the manifest is stale. The default voice is `en-IN-NeerjaNeural`; edit `VOICE` and `RATE` at the top of the script. Use `edge-tts --list-voices` to browse available voices. Run `python scripts/generate_narration.py --sample` to create comparison clips for three voices in `public/audio/voice-samples/`.
+Generation requires Python, an internet connection, `edge-tts`, and `imageio-ffmpeg`. The generator trims leading and trailing silence with the bundled ffmpeg. It compares each scene's speech and voice hash with `public/audio/manifest.json`, regenerating missing or stale files; use `python scripts/generate_narration.py --force` to regenerate all scenes. The build logs a prominent warning when the manifest is stale. The default voice is `en-IN-NeerjaNeural` at `+8%`; edit `VOICE` and `RATE` at the top of the script. Use `edge-tts --list-voices` to browse available voices. Run `python scripts/generate_narration.py --sample` to create comparison clips for three voices, or `python scripts/generate_narration.py --test-name` to compare app-name pronunciations in `public/audio/voice-samples/`.
 
 ## Limitations
 
